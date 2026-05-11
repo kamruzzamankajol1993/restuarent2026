@@ -14,19 +14,24 @@
   <meta property="og:url" content="{{ url()->full() }}">
   <meta property="og:title" content="@yield('title')">
   <meta property="og:description" content="Manage your restaurant efficiently with Progga RMS.">
-  <meta property="og:image" content=""> <meta property="twitter:card" content="summary_large_image">
+  <meta property="og:image" content="{{ asset('public/'.$restaurantSettingLogo) }}">
+  <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="{{ url()->full() }}">
   <meta property="twitter:title" content="@yield('title')">
   <meta property="twitter:description" content="Manage your restaurant efficiently with Progga RMS.">
-  <meta property="twitter:image" content="">
-  <link rel="icon" type="image/x-icon" href="">
-  <link rel="apple-touch-icon" href="">
+  <meta property="twitter:image" content="{{ asset('public/'.$restaurantSettingLogo) }}">
+  <link rel="icon" type="image/x-icon" href="{{ asset('public/'.$restaurantSettingIconName) }}">
+  <link rel="apple-touch-icon" href="{{ asset('public/'.$restaurantSettingIconName) }}">
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+
   <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 
   <link rel="stylesheet" href="{{ asset('/') }}public/admin/assets/css/progga-style.css">
@@ -46,15 +51,21 @@
       @yield('body')
 
       @include('admin.include.footer')
-    </div></div><div class="progga-toast-container"></div>
+    </div>
+  </div>
 
- <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <div class="progga-toast-container"></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
 
   <script src="{{ asset('/') }}public/admin/assets/js/progga-app.js"></script>
@@ -63,31 +74,29 @@
   <script>
     document.addEventListener("DOMContentLoaded", function () {
 
-    // ১. Choices.js (Select2 এর বিকল্প) ইনিশিয়ালাইজেশন
-    // ক্লাস: .progga-select
-    const selectElements = document.querySelectorAll('.progga-select');
-    selectElements.forEach(function(element) {
+    // ১. Choices.js (যেখানে বিশেষভাবে Choices.js লাগবে সেখানে .progga-choices ক্লাস ব্যবহার করবেন)
+    const choicesElements = document.querySelectorAll('.progga-choices');
+    choicesElements.forEach(function(element) {
         new Choices(element, {
-            searchEnabled: true,      // সার্চ অপশন চালু
-            itemSelectText: '',       // সিলেক্ট করার টেক্সট হাইড করা (ক্লিন লুকের জন্য)
-            removeItemButton: true,   // মাল্টিপলের ক্ষেত্রে রিমুভ বাটন
-            shouldSort: false         // অপশনগুলো ডিফল্ট অর্ডারে রাখার জন্য
+            searchEnabled: true,
+            itemSelectText: '',
+            removeItemButton: true,
+            shouldSort: false
         });
+        // Select2 যাতে এই এলিমেন্টে কাজ না করে, তা নিশ্চিত করতে
+        element.setAttribute('data-no-select2', 'true');
     });
 
-    // ২. Flatpickr (No-jQuery Datepicker) ইনিশিয়ালাইজেশন
-    // ক্লাস: .progga-datepicker
+    // ২. Flatpickr (No-jQuery Datepicker)
     flatpickr('.progga-datepicker', {
-        dateFormat: "Y-m-d",          // ডাটাবেস ফ্রেন্ডলি ফরম্যাট
-        allowInput: true,             // ম্যানুয়ালি টাইপ করার অপশন
-        // enableTime: true,          // সময় লাগলে এটি আনকমেন্ট করবেন
+        dateFormat: "Y-m-d",
+        allowInput: true,
     });
 
-    // ৩. Summernote Lite (Rich Text Editor) ইনিশিয়ালাইজেশন
-    // ক্লাস: .progga-editor
+    // ৩. Summernote Lite (Rich Text Editor)
     if (typeof jQuery !== 'undefined') {
         $('.progga-editor').summernote({
-            height: 250,              // ডিফল্ট উচ্চতা
+            height: 250,
             placeholder: 'Type your content here...',
             toolbar: [
                 ['style', ['style']],
@@ -101,40 +110,48 @@
         });
     }
 
-    // ৪. SweetAlert2 (Delete Confirmation এর জন্য)
-    // ক্লাস: .progga-delete-btn
+    // ৪. SweetAlert2 (Delete Confirmation)
     document.addEventListener('click', function (e) {
-        // যদি ক্লিক করা এলিমেন্ট বা তার প্যারেন্ট .progga-delete-btn হয়
         const deleteBtn = e.target.closest('.progga-delete-btn');
         if (deleteBtn) {
             e.preventDefault();
-            const form = deleteBtn.closest('form'); // ডিলিট বাটনের ফর্মটি খুঁজবে
+            const form = deleteBtn.closest('form');
 
             Swal.fire({
                 title: 'Are you sure?',
                 text: "You won't be able to revert this data!",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#21352a', // আপনার থিমের প্রাইমারি কালার
+                confirmButtonColor: '#21352a',
                 cancelButtonColor: '#d33',
                 confirmButtonText: 'Yes, delete it!'
             }).then((result) => {
                 if (result.isConfirmed && form) {
-                    form.submit(); // ইউজার ইয়েস দিলে ফর্ম সাবমিট হবে
+                    form.submit();
                 }
             });
         }
     });
 
+    // 5. Sidebar Auto Scroll to Active Item
+    const activeSidebarItem = document.querySelector('.progga-sidebar-nav .progga-nav-link.active');
+    if (activeSidebarItem) {
+        setTimeout(() => {
+            activeSidebarItem.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }, 100);
+    }
+
 });
 
-// ৫. SweetAlert2 (সাকসেস বা এরর মেসেজ দেখানোর ফাংশন)
-// যেকোনো পেজ থেকে কল করা যাবে: showToast('Success', 'Data saved!', 'success');
+// ৬. Global Toast Function
 window.showToast = function(title, text, icon = 'success') {
     Swal.fire({
         toast: true,
         position: 'top-end',
-        icon: icon, // 'success', 'error', 'warning', 'info'
+        icon: icon,
         title: title,
         text: text,
         showConfirmButton: false,
@@ -142,6 +159,15 @@ window.showToast = function(title, text, icon = 'success') {
         timerProgressBar: true,
     });
 };
+
+$(document).ready(function() {
+    // ৩ সেকেন্ড (৩০০০ মিলি-সেকেন্ড) পর অ্যালার্ট মেসেজ অটোমেটিক হাইড হয়ে যাবে
+    setTimeout(function() {
+        $('.alert').fadeOut('slow', function() {
+            $(this).remove(); // হাইড হওয়ার পর DOM থেকেও রিমুভ করে দিবে
+        });
+    }, 3000);
+});
   </script>
 
   @yield('script')

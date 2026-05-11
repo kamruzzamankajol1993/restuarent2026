@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Login — Progga RMS</title>
+  <title>Login — {{ $restaurantSettingName ?? 'Progga RMS' }}</title>
   <meta name="title" content="Login — Progga RMS">
   <meta name="description" content="Sign in to Progga Restaurant Management System to manage your orders, kitchen, and analytics.">
   <meta name="keywords" content="restaurant management, pos, kitchen board, progga rms">
@@ -14,12 +14,13 @@
   <meta property="og:url" content="{{ url()->current() }}">
   <meta property="og:title" content="Login — Progga RMS">
   <meta property="og:description" content="Sign in to Progga Restaurant Management System.">
-  <meta property="og:image" content=""> <meta property="twitter:card" content="summary_large_image">
+  <meta property="og:image" content="{{ asset('public/'.$restaurantSettingLogo) }}"> <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="{{ url()->current() }}">
   <meta property="twitter:title" content="Login — Progga RMS">
   <meta property="twitter:description" content="Sign in to Progga Restaurant Management System.">
-  <meta property="twitter:image" content="">
-  <link rel="icon" type="image/x-icon" href=""> <link rel="apple-touch-icon" href="">
+  <meta property="twitter:image" content="{{ asset('public/'.$restaurantSettingLogo) }}">
+  <link rel="icon" type="image/x-icon" href="{{ asset('public/'.$restaurantSettingIconName) }}">
+  <link rel="apple-touch-icon" href="{{ asset('public/'.$restaurantSettingIconName) }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ asset('/') }}public/admin/assets/css/progga-style.css">

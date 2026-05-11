@@ -1,13 +1,11 @@
 /**
  * Progga RMS — POS System
  * progga-pos.js
- * UI interactions only — data is inline in HTML (backend will wire real logic).
+ * UI / navigation only — backend handles all data.
  */
 
 (function () {
   'use strict';
-
-  function fmt(n) { return '৳' + parseFloat(n).toFixed(2); }
 
   /* ─── Step navigation ─── */
   function goToStep(n) {
@@ -35,12 +33,10 @@
       });
     });
 
-    /* Available / reserved → select table, go to step 2 */
+    /* Available / reserved → open new order modal */
     document.querySelectorAll('.progga-pos-table-card.available, .progga-pos-table-card.reserved').forEach(function (card) {
       card.addEventListener('click', function () {
-        var num = card.dataset.tableNum;
-        setTableLabel(num);
-        goToStep(2);
+        openNewOrderModal();
       });
     });
 
@@ -53,13 +49,66 @@
     });
   }
 
-  function setTableLabel(num) {
-    var el = document.getElementById('posSelectedTable');
-    var ct = document.getElementById('posCartTable');
-    var pl = document.getElementById('payTableLabel');
-    if (el) el.textContent = num;
-    if (ct) ct.textContent = num;
-    if (pl) pl.textContent = num;
+  /* ─── Takeaway shortcut button ─── */
+  function initOrderModeBtns() {
+    var takeawayBtn = document.getElementById('modeTakeaway');
+    if (!takeawayBtn) return;
+    takeawayBtn.addEventListener('click', function () {
+      openNewOrderModal();
+    });
+  }
+
+  /* ─── Open new order modal ─── */
+  function openNewOrderModal() {
+    var modal = document.getElementById('newOrderModal');
+    if (!modal) return;
+
+    /* Reset form to clean state */
+    var walkIn = document.getElementById('posWalkIn');
+    if (walkIn) walkIn.checked = true;
+    var nameEl  = modal.querySelector('[name="customer_name"]');
+    var phoneEl = modal.querySelector('[name="customer_phone"]');
+    if (nameEl)  nameEl.value = '';
+    if (phoneEl) phoneEl.value = '';
+
+    var dineRadio = document.getElementById('posTypeDineIn');
+    if (dineRadio) dineRadio.checked = true;
+
+    var gc = document.getElementById('posGuestCount');
+    var gh = document.getElementById('posGuestHidden');
+    if (gc) gc.textContent = '2';
+    if (gh) gh.value = '2';
+
+    new bootstrap.Modal(modal).show();
+  }
+
+  /* ─── Start Order — just close modal and proceed ─── */
+  function initStartOrderBtn() {
+    var btn = document.getElementById('posStartOrderBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var m = bootstrap.Modal.getInstance(document.getElementById('newOrderModal'));
+      if (m) m.hide();
+      goToStep(2);
+    });
+  }
+
+  /* ─── Guest counter ─── */
+  function initGuestCounter() {
+    var minus  = document.getElementById('posGuestMinus');
+    var plus   = document.getElementById('posGuestPlus');
+    var count  = document.getElementById('posGuestCount');
+    var hidden = document.getElementById('posGuestHidden');
+    if (!minus || !plus || !count) return;
+
+    function setGuests(n) {
+      n = Math.max(1, Math.min(20, n));
+      count.textContent = n;
+      if (hidden) hidden.value = n;
+    }
+
+    minus.addEventListener('click', function () { setGuests(parseInt(count.textContent) - 1); });
+    plus.addEventListener('click',  function () { setGuests(parseInt(count.textContent) + 1); });
   }
 
   /* ─── Category filter ─── */
@@ -68,10 +117,9 @@
       item.addEventListener('click', function () {
         document.querySelectorAll('.progga-pos-cat-item').forEach(function (i) { i.classList.remove('active'); });
         item.classList.add('active');
-        var catId = item.dataset.catId;
         var search = document.getElementById('posFoodSearch');
         if (search) search.value = '';
-        showFoodsByCategory(catId);
+        showFoodsByCategory(item.dataset.catId);
       });
     });
   }
@@ -100,28 +148,49 @@
     });
   }
 
-  /* ─── Back button ─── */
+  /* ─── Back to tables ─── */
   function initBackButtons() {
     var back = document.getElementById('posBackToTables');
     if (back) back.addEventListener('click', function () { goToStep(1); });
   }
 
-  /* ─── Pay button → payment modal ─── */
+  /* ─── Mobile cart slide-up ─── */
+  function initMobileCart() {
+    var fab      = document.getElementById('posCartFab');
+    var cart     = document.querySelector('.progga-pos-cart');
+    var backdrop = document.getElementById('posMobileBackdrop');
+    var closeBtn = document.getElementById('posMobileCartClose');
+    if (!fab || !cart) return;
+
+    function openCart() {
+      cart.classList.add('pos-cart-open');
+      if (backdrop) backdrop.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeCart() {
+      cart.classList.remove('pos-cart-open');
+      if (backdrop) backdrop.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    fab.addEventListener('click', openCart);
+    if (closeBtn) closeBtn.addEventListener('click', closeCart);
+    if (backdrop) backdrop.addEventListener('click', closeCart);
+  }
+
+  /* ─── Pay button ─── */
   function initPayBtn() {
     var btn = document.getElementById('posGoPayment');
     if (!btn) return;
     btn.addEventListener('click', function () {
       var modal = document.getElementById('paymentModal');
-      if (modal) {
-        var tableEl = document.getElementById('posSelectedTable');
-        var payLabel = document.getElementById('payTableLabel');
-        if (tableEl && payLabel) payLabel.textContent = tableEl.textContent;
-        new bootstrap.Modal(modal).show();
-      }
+      if (modal) new bootstrap.Modal(modal).show();
     });
   }
 
-  /* ─── Occupied table offcanvas ─── */
+  /* ─── Occupied table offcanvas (reads inline data-order JSON) ─── */
+  function fmt(n) { return '৳' + parseFloat(n).toFixed(2); }
+
   function openOccupiedOffcanvas(tableNum, zone, capacity, order) {
     document.getElementById('ocTableNum').textContent  = tableNum;
     document.getElementById('ocTableMeta').textContent = zone + ' · ' + capacity + ' seats';
@@ -131,7 +200,7 @@
       '<span class="progga-oc-chip"><i class="bi bi-clock"></i> ' + order.elapsed + ' min</span>';
 
     var bodyHtml = '<div class="progga-oc-section-label">Current Order</div>';
-    var subtotal  = 0;
+    var subtotal = 0;
     order.kots.forEach(function (kot) {
       bodyHtml += '<div class="progga-oc-kot"><div class="progga-oc-kot-head">' +
         '<span class="progga-oc-kot-label">' + kot.id + '</span>' +
@@ -159,13 +228,11 @@
 
     document.getElementById('ocAddMoreBtn').onclick = function () {
       oc.hide();
-      setTableLabel(tableNum);
       goToStep(2);
     };
 
     document.getElementById('ocPayBtn').onclick = function () {
       oc.hide();
-      setTableLabel(tableNum);
       var modal = document.getElementById('paymentModal');
       if (modal) new bootstrap.Modal(modal).show();
     };
@@ -179,10 +246,14 @@
     showFoodsByCategory('1');
     goToStep(1);
     initTableFilters();
+    initOrderModeBtns();
+    initStartOrderBtn();
+    initGuestCounter();
     initCategoryFilter();
     initFoodSearch();
     initBackButtons();
     initPayBtn();
+    initMobileCart();
   });
 
 })();

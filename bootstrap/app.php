@@ -12,7 +12,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+             'DNS1D' => Milon\Barcode\Facades\DNS1DFacade::class,
+            'DNS2D' => Milon\Barcode\Facades\DNS2DFacade::class,
+            'Excel' => Maatwebsite\Excel\Facades\Excel::class,
+        ]);
+
+         $middleware->validateCsrfTokens(except: [
+            'payment/success',
+            'payment/fail',
+            'payment/cancel',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -1,7 +1,7 @@
 @extends('admin.master.master')
 
 @section('title')
-Dashboard — Progga RMS
+Dashboard — {{ $restaurantSettingName ?? 'Progga RMS' }}
 @endsection
 
 @section('css')
