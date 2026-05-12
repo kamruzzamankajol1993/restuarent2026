@@ -25,11 +25,35 @@
     <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='pos.php'?'active':'' ?>" href="pos.php"><i class="bi bi-display progga-nav-icon"></i><span>POS System</span><span class="progga-nav-badge">LIVE</span></a></div>
     <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='kitchen.php'?'active':'' ?>" href="kitchen.php"><i class="bi bi-fire progga-nav-icon"></i><span>Kitchen Board</span></a></div>
     <div class="progga-nav-section" ><div class="progga-nav-section-label">Menu</div></div>
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='food-category.php'?'active':'' ?>" href="food-category.php"><i class="bi bi-tags-fill progga-nav-icon"></i><span>Food Categories</span></a></div>
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='food-subcategory.php'?'active':'' ?>" href="food-subcategory.php"><i class="bi bi-diagram-3-fill progga-nav-icon"></i><span>Subcategories</span></a></div>
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='cuisine-type.php'?'active':'' ?>" href="cuisine-type.php"><i class="bi bi-globe progga-nav-icon"></i><span>Cuisine Types</span></a></div>
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='food-menu.php'||$current==='add-food.php'?'active':'' ?>" href="food-menu.php"><i class="bi bi-journal-richtext progga-nav-icon"></i><span>Food Menu</span></a></div>
-    <div class="progga-nav-section" data-roles="super_admin,admin,manager,cashier,waiter"><div class="progga-nav-section-label">Operations</div></div>
+    @can('food-category-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('food-category.*') ? 'active' : '' }}" href="{{ route('food-category.index') }}">
+            <i class="bi bi-tags-fill progga-nav-icon"></i><span>Food Categories</span>
+        </a>
+    </div>
+    @endcan
+    @can('cuisine-type-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('cuisine-type.*') ? 'active' : '' }}" href="{{ route('cuisine-type.index') }}">
+            <i class="bi bi-globe progga-nav-icon"></i><span>Cuisine Types</span>
+        </a>
+    </div>
+    @endcan
+    @can('allergen-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('allergen.*') || request()->routeIs('course-type.*') ? 'active' : '' }}" href="{{ route('allergen.index') }}">
+            <i class="bi bi-sliders progga-nav-icon"></i><span>Food Attributes</span>
+        </a>
+    </div>
+    @endcan
+    @can('food-item-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('food-item.*') ? 'active' : '' }}" href="{{ route('food-item.index') }}">
+            <i class="bi bi-journal-richtext progga-nav-icon"></i><span>Food Menu</span>
+        </a>
+    </div>
+    @endcan
+    <div class="progga-nav-section" ><div class="progga-nav-section-label">Operations</div></div>
    @can('table-view')
 <div class="progga-nav-item">
     <a class="progga-nav-link {{ request()->routeIs('table.*') ? 'active' : '' }}" href="{{ route('table.index') }}">

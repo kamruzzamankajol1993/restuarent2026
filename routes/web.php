@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\RewardPointSettingController;
 use App\Http\Controllers\Admin\TableController;
 use App\Http\Controllers\Admin\TableBookingController;
 use App\Http\Controllers\Admin\OccasionController;
+use App\Http\Controllers\Admin\FoodCategoryController;
 Route::get('/', function () {
     return view('admin.auth.login');
 });
@@ -57,7 +58,26 @@ Route::post('/reset-password', [CustomResetPasswordController::class, 'resetPass
 Route::middleware(['auth'])->group(function () {
 
 
+// Food Item Routes
+    Route::resource('food-item', App\Http\Controllers\Admin\FoodItemController::class);
+    Route::post('food-item-status/{id}', [App\Http\Controllers\Admin\FoodItemController::class, 'updateStatus'])->name('food-item.status');
+// Allergen Routes
+    Route::resource('allergen', App\Http\Controllers\Admin\AllergenController::class);
+    Route::post('allergen-status/{id}', [App\Http\Controllers\Admin\AllergenController::class, 'updateStatus'])->name('allergen.status');
 
+    // Course Type Routes
+    Route::resource('course-type', App\Http\Controllers\Admin\CourseTypeController::class);
+    Route::post('course-type-status/{id}', [App\Http\Controllers\Admin\CourseTypeController::class, 'updateStatus'])->name('course-type.status');
+
+
+// Food Category Routes
+    Route::resource('food-category', FoodCategoryController::class);
+Route::post('food-category-status/{id}', [FoodCategoryController::class, 'updateStatus'])->name('food-category.status');
+
+
+// Cuisine Type Routes
+    Route::resource('cuisine-type', App\Http\Controllers\Admin\CuisineTypeController::class);
+    Route::post('cuisine-type-status/{id}', [App\Http\Controllers\Admin\CuisineTypeController::class, 'updateStatus'])->name('cuisine-type.status');
 // ==========================================
     // Table Booking Routes
     // ==========================================
