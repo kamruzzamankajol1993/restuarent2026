@@ -116,10 +116,12 @@ class FoodItemController extends Controller
                 'spice_level' => $request->spice_level,
                 'serving_size' => $request->serving_size,
                 'base_price' => $request->base_price,
+                'bengali_name' => $request->bengali_name,
                 'discount_price' => $request->discount_price,
                 'tax_rate' => $request->tax_rate,
                 'preparation_time' => $request->preparation_time,
                 'calories' => $request->calories,
+                'is_draft' => $request->is_draft ?? 0,
                 'allergens' => $request->allergens ?? [],
                 'allergen_notes' => $request->allergen_notes,
                 'main_image' => $mainImageName,
@@ -230,6 +232,7 @@ class FoodItemController extends Controller
                 'spice_level' => $request->spice_level,
                 'serving_size' => $request->serving_size,
                 'base_price' => $request->base_price,
+                'bengali_name' => $request->bengali_name,
                 'discount_price' => $request->discount_price,
                 'tax_rate' => $request->tax_rate,
                 'preparation_time' => $request->preparation_time,
@@ -242,6 +245,7 @@ class FoodItemController extends Controller
                 'is_chefs_special' => $request->has('is_chefs_special') ? 1 : 0,
                 'is_dine_in' => $request->has('is_dine_in') ? 1 : 0,
                 'is_takeaway' => $request->has('is_takeaway') ? 1 : 0,
+                'is_draft' => $request->is_draft ?? 0,
                 'active_days' => $request->active_days ?? [],
                 'start_time' => $request->start_time,
                 'end_time' => $request->end_time,
@@ -358,4 +362,6 @@ class FoodItemController extends Controller
             return back()->with('error', 'Failed to delete! Please try again.');
         }
     }
+
+   
 }

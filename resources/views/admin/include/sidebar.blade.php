@@ -22,8 +22,21 @@
         </a>
     </div>
     @endcan
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='pos.php'?'active':'' ?>" href="pos.php"><i class="bi bi-display progga-nav-icon"></i><span>POS System</span><span class="progga-nav-badge">LIVE</span></a></div>
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='kitchen.php'?'active':'' ?>" href="kitchen.php"><i class="bi bi-fire progga-nav-icon"></i><span>Kitchen Board</span></a></div>
+    @can('pos-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('pos.*') ? 'active' : '' }}" href="{{ route('pos.index') }}">
+            <i class="bi bi-display progga-nav-icon"></i><span>POS System</span><span class="progga-nav-badge">LIVE</span>
+        </a>
+    </div>
+    @endcan
+
+    @can('kitchen-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('kitchen.*') ? 'active' : '' }}" href="{{ route('kitchen.index') }}">
+            <i class="bi bi-fire progga-nav-icon"></i><span>Kitchen Board</span>
+        </a>
+    </div>
+    @endcan
     <div class="progga-nav-section" ><div class="progga-nav-section-label">Menu</div></div>
     @can('food-category-view')
     <div class="progga-nav-item">
@@ -54,10 +67,27 @@
     </div>
     @endcan
     <div class="progga-nav-section" ><div class="progga-nav-section-label">Operations</div></div>
+
+    @can('order-view')
+    <div class="progga-nav-item">
+        <a class="progga-nav-link {{ request()->routeIs('order.*') ? 'active' : '' }}" href="{{ route('order.index') }}">
+            <i class="bi bi-receipt-cutoff progga-nav-icon"></i><span>Order List</span>
+        </a>
+    </div>
+    @endcan
+
    @can('table-view')
 <div class="progga-nav-item">
     <a class="progga-nav-link {{ request()->routeIs('table.*') ? 'active' : '' }}" href="{{ route('table.index') }}">
         <i class="bi bi-table progga-nav-icon"></i><span>Table Management</span>
+    </a>
+</div>
+@endcan
+
+@can('qrcode-view')
+<div class="progga-nav-item">
+    <a class="progga-nav-link {{ request()->routeIs('qrcode.*') ? 'active' : '' }}" href="{{ route('qrcode.index') }}">
+        <i class="bi bi-qr-code-scan progga-nav-icon"></i><span>Table QR Codes</span>
     </a>
 </div>
 @endcan
@@ -91,7 +121,13 @@
     </div>
     @endcan
     <div class="progga-nav-section" ><div class="progga-nav-section-label">Analytics</div></div>
-    <div class="progga-nav-item" ><a class="progga-nav-link <?= $current==='reports.php'?'active':'' ?>" href="reports.php"><i class="bi bi-bar-chart-fill progga-nav-icon"></i><span>Reports</span></a></div>
+    @can('report-view')
+<div class="progga-nav-item">
+    <a class="progga-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
+        <i class="bi bi-bar-chart-fill progga-nav-icon"></i><span>Reports</span>
+    </a>
+</div>
+@endcan
     <div class="progga-nav-section" ><div class="progga-nav-section-label">System</div></div>
 
     @can('systemsetting-view')

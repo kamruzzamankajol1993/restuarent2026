@@ -41,6 +41,13 @@
                                 <div class="col-md-6"><div class="progga-form-group"><label class="progga-form-label">Website</label><input type="url" name="website" class="progga-form-control" value="{{ $restaurant->website ?? '' }}"></div></div>
 
                                 <div class="col-md-6">
+    <div class="progga-form-group">
+        <label class="progga-form-label">App Link</label>
+        <input type="url" name="app_link" class="progga-form-control" value="{{ $restaurant->app_link ?? '' }}" placeholder="https://play.google.com/store/apps/...">
+    </div>
+</div>
+
+                                <div class="col-md-6">
                                     <div class="progga-form-group">
                                         <label class="progga-form-label">Restaurant Icon (.png)</label>
                                         <div class="d-flex align-items-center gap-3">

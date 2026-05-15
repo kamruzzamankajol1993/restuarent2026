@@ -18,9 +18,9 @@
                     @if($category->image)
                         <img src="{{ asset('public/uploads/categories/' . $category->image) }}"
                              alt="{{ $category->name }}"
-                             style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--progga-border);">
+                             style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid var(--progga-border);">
                     @else
-                        <div style="width: 100px; height: 100px; border-radius: 8px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #ccc; border: 1px dashed var(--progga-border);">
+                        <div style="width: 60px; height: 60px; border-radius: 8px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #ccc; border: 1px dashed var(--progga-border);">
                             <i class="bi bi-image"></i>
                         </div>
                     @endif

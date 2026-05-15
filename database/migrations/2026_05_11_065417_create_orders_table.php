@@ -28,7 +28,7 @@ return new class extends Migration
 
             // Delivery & Status
             $table->text('delivery_address')->nullable();
-            $table->string('status')->default('Pending'); // Pending, Processing, Completed, Cancelled
+            $table->string('status')->default('Pending'); // Pending, Processing,Cooking, Completed, Cancelled
             $table->string('order_type'); // Dine-In, Takeaway, Delivery
 
             // User & Time

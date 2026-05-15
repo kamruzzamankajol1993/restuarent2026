@@ -12,12 +12,14 @@ use Illuminate\Support\Facades\Log;
 
 class TableController extends Controller
 {
-    public function index()
+  public function index()
     {
         $zones = Zone::all();
 
+        // টেবিলের সাথে রানিং অর্ডার, KOT এবং ওয়েটারের ডাটা নিয়ে আসা হচ্ছে
         $tables = Table::with(['zone', 'orders' => function($query) {
-            $query->whereIn('status', ['Pending', 'Processing']);
+            $query->whereIn('status', ['Pending', 'Processing'])
+                  ->with(['kots.orderDetails', 'waiter']); // Eager load KOTs and Waiter
         }])->orderBy('table_number', 'asc')->get();
 
         $tables->map(function ($table) {
@@ -38,7 +40,6 @@ class TableController extends Controller
             'tables', 'zones', 'totalTables', 'occupiedCount', 'availableCount', 'reservedCount'
         ));
     }
-
     public function store(Request $request)
     {
         $request->validate([

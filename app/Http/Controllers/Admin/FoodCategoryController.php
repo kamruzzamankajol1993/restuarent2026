@@ -150,4 +150,10 @@ class FoodCategoryController extends Controller
             return back()->with('error', 'Failed to delete category! ' . $e->getMessage());
         }
     }
+
+     public function getSubcategories($id)
+{
+    $subcategories = FoodCategory::where('parent_category_id', $id)->where('status', 1)->get();
+    return response()->json($subcategories);
+}
 }

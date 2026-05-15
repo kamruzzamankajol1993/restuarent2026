@@ -11,13 +11,5 @@
   <div class="progga-oc-body offcanvas-body" id="ocBody"></div>
   <div class="progga-oc-footer">
     <div id="ocTotals"></div>
-    <div class="progga-oc-actions">
-      <button class="progga-btn progga-btn-outline" id="ocAddMoreBtn" type="button">
-        <i class="bi bi-plus-circle"></i> Add More Food
-      </button>
-      <button class="progga-btn progga-btn-primary" id="ocPayBtn" type="button">
-        <i class="bi bi-credit-card"></i> Payment
-      </button>
     </div>
-  </div>
 </div>

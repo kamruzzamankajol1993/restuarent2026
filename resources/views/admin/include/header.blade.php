@@ -6,7 +6,7 @@
   </div>
   <div class="progga-navbar-actions">
     <button class="progga-navbar-icon-btn" type="button"><i class="bi bi-bell"></i><span class="progga-notif-dot"></span></button>
-    <a class="progga-btn progga-btn-secondary progga-btn-sm" href="pos.php"><i class="bi bi-display"></i> POS</a>
+    <a class="progga-btn progga-btn-secondary progga-btn-sm" href="{{ route('pos.index') }}"><i class="bi bi-display"></i> POS</a>
     <div class="dropdown">
       <img src="{{ Auth::user()->image ? asset('public/' . Auth::user()->image) : 'https://ui-avatars.com/api/?name='.urlencode(Auth::user()->name).'&background=21352a&color=d5aa65&size=68' }}" class="progga-navbar-avatar" alt="User" data-bs-toggle="dropdown" role="button">
       <ul class="dropdown-menu dropdown-menu-end" style="border:1px solid var(--progga-border);border-radius:var(--progga-radius);">

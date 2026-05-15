@@ -18,33 +18,33 @@
     @if(session('error')) <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ session('error') }}</div> @endif
 
     <div class="row g-4">
-        <div class="col-lg-6">
+        <div class="col-12">
             <div class="progga-card">
-                <div class="progga-card-header d-flex justify-content-between align-items-center bg-light">
+                <div class="progga-card-header d-flex justify-content-between align-items-center">
                     <h5 class="m-0 fw-bold"><i class="bi bi-exclamation-circle text-danger me-2"></i>Allergens</h5>
                     @can('allergen-create')
-                    <button class="progga-btn progga-btn-primary progga-btn-sm" onclick="addModal('allergen')">
+                    <button class="progga-btn progga-btn-primary" onclick="addModal('allergen')">
                         <i class="bi bi-plus-lg"></i> Add New
                     </button>
                     @endcan
                 </div>
-                <div class="progga-card-body p-3" id="allergen_data_container">
+                <div id="allergen_data_container">
                     @include('admin.food_attributes.allergen_table')
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-6">
+        <div class="col-12">
             <div class="progga-card">
-                <div class="progga-card-header d-flex justify-content-between align-items-center bg-light">
+                <div class="progga-card-header d-flex justify-content-between align-items-center">
                     <h5 class="m-0 fw-bold"><i class="bi bi-ui-radios text-info me-2"></i>Course Types</h5>
                     @can('course-type-create')
-                    <button class="progga-btn progga-btn-primary progga-btn-sm" onclick="addModal('course-type')">
+                    <button class="progga-btn progga-btn-primary" onclick="addModal('course-type')">
                         <i class="bi bi-plus-lg"></i> Add New
                     </button>
                     @endcan
                 </div>
-                <div class="progga-card-body p-3" id="course_type_data_container">
+                <div id="course_type_data_container">
                     @include('admin.food_attributes.course_type_table')
                 </div>
             </div>

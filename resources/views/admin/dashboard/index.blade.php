@@ -4,242 +4,309 @@
 Dashboard — {{ $restaurantSettingName ?? 'Progga RMS' }}
 @endsection
 
-@section('css')
-@endsection
-
 @section('body')
 
 <main class="progga-content">
 
-        <!-- Page Header -->
-        <div class="progga-page-header">
-          <div>
-            <h1 class="progga-page-title">Dashboard</h1>
-            <div class="progga-breadcrumb"><span class="progga-breadcrumb-item active">Home</span></div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <span class="progga-live-indicator"><span class="progga-live-dot"></span> Live</span>
-            <button class="progga-btn progga-btn-outline progga-btn-sm" type="button">
-              <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
-          </div>
-        </div>
+    <div class="progga-page-header">
+      <div>
+        <h1 class="progga-page-title">Dashboard</h1>
+        <div class="progga-breadcrumb"><span class="progga-breadcrumb-item active">Home</span></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span class="progga-live-indicator"><span class="progga-live-dot"></span> Live</span>
+        <button class="progga-btn progga-btn-outline progga-btn-sm" type="button" onclick="window.location.reload()">
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+      </div>
+    </div>
 
-        <!-- Stat Cards -->
-        <div class="row g-3 mb-4">
-          <div class="col-xl-3 col-md-6">
-            <div class="progga-stat-card">
-              <div class="progga-stat-icon secondary"><i class="bi bi-currency-dollar"></i></div>
-              <div class="progga-stat-info">
-                <div class="progga-stat-label">Today's Sales</div>
-                <div class="progga-stat-value">৳24,580</div>
-                <div class="progga-stat-change up"><i class="bi bi-arrow-up-right"></i> +12.4% vs yesterday</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-xl-3 col-md-6">
-            <div class="progga-stat-card">
-              <div class="progga-stat-icon success"><i class="bi bi-graph-up-arrow"></i></div>
-              <div class="progga-stat-info">
-                <div class="progga-stat-label">Monthly Revenue</div>
-                <div class="progga-stat-value">৳3.1L</div>
-                <div class="progga-stat-change up"><i class="bi bi-arrow-up-right"></i> +8.2% this month</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-xl-3 col-md-6">
-            <div class="progga-stat-card">
-              <div class="progga-stat-icon primary"><i class="bi bi-receipt"></i></div>
-              <div class="progga-stat-info">
-                <div class="progga-stat-label">Total Orders</div>
-                <div class="progga-stat-value">148</div>
-                <div class="progga-stat-change up"><i class="bi bi-arrow-up-right"></i> +18 today</div>
-              </div>
-            </div>
-          </div>
-          <div class="col-xl-3 col-md-6">
-            <div class="progga-stat-card">
-              <div class="progga-stat-icon warning"><i class="bi bi-layout-wtf"></i></div>
-              <div class="progga-stat-info">
-                <div class="progga-stat-label">Running Tables</div>
-                <div class="progga-stat-value">7 / 18</div>
-                <div class="progga-stat-change neutral"><i class="bi bi-dash"></i> 11 available</div>
-              </div>
+    <div class="row g-3 mb-4">
+      <div class="col-xl-3 col-md-6">
+        <div class="progga-stat-card">
+          <div class="progga-stat-icon secondary"><i class="bi bi-currency-dollar"></i></div>
+          <div class="progga-stat-info">
+            <div class="progga-stat-label">Today's Sales</div>
+            <div class="progga-stat-value">৳{{ number_format($todaySales) }}</div>
+            <div class="progga-stat-change {{ $salesChange >= 0 ? 'up' : 'down' }}">
+                <i class="bi {{ $salesChange >= 0 ? 'bi-arrow-up-right' : 'bi-arrow-down-right' }}"></i>
+                {{ $salesChange > 0 ? '+' : '' }}{{ number_format($salesChange, 1) }}% vs yesterday
             </div>
           </div>
         </div>
-
-        <!-- Charts Row -->
-        <div class="row g-3 mb-4">
-          <!-- Revenue Chart -->
-          <div class="col-xl-8">
-            <div class="progga-card">
-              <div class="progga-card-header">
-                <div>
-                  <div class="progga-card-title">Revenue Overview</div>
-                  <div class="progga-card-subtitle">Daily revenue trend</div>
-                </div>
-                <div class="progga-chart-toggle">
-                  <button class="progga-chart-toggle-btn active" data-revenue-period="7">7 Days</button>
-                  <button class="progga-chart-toggle-btn" data-revenue-period="30">30 Days</button>
-                </div>
-              </div>
-              <div class="progga-card-body">
-                <div class="progga-chart-container" style="height:260px;">
-                  <canvas id="revenueChart"></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Order Status Donut -->
-          <div class="col-xl-4">
-            <div class="progga-card" style="height:100%;">
-              <div class="progga-card-header">
-                <div class="progga-card-title">Order Status</div>
-              </div>
-              <div class="progga-card-body" style="display:flex;flex-direction:column;align-items:center;">
-                <div class="progga-chart-container" style="height:220px;width:100%;">
-                  <canvas id="orderStatusChart"></canvas>
-                </div>
-              </div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <div class="progga-stat-card">
+          <div class="progga-stat-icon success"><i class="bi bi-graph-up-arrow"></i></div>
+          <div class="progga-stat-info">
+            <div class="progga-stat-label">Monthly Revenue</div>
+            <div class="progga-stat-value">৳{{ number_format($monthlySales) }}</div>
+            <div class="progga-stat-change {{ $monthlyChange >= 0 ? 'up' : 'down' }}">
+                <i class="bi {{ $monthlyChange >= 0 ? 'bi-arrow-up-right' : 'bi-arrow-down-right' }}"></i>
+                {{ $monthlyChange > 0 ? '+' : '' }}{{ number_format($monthlyChange, 1) }}% this month
             </div>
           </div>
         </div>
-
-        <!-- Top Items + Kitchen Queue -->
-        <div class="row g-3 mb-4">
-          <!-- Top Items -->
-          <div class="col-xl-5">
-            <div class="progga-card">
-              <div class="progga-card-header">
-                <div class="progga-card-title">Top Selling Items</div>
-                <span class="progga-badge progga-badge-secondary">This Week</span>
-              </div>
-              <div class="progga-card-body">
-                <div class="progga-chart-container" style="height:220px;">
-                  <canvas id="topItemsChart"></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Kitchen Pending -->
-          <div class="col-xl-7">
-            <div class="progga-card">
-              <div class="progga-card-header">
-                <div class="progga-card-title">
-                  Kitchen Queue
-                  <span class="progga-badge progga-badge-danger" style="margin-left:8px;">5 Pending</span>
-                </div>
-                <span class="progga-live-indicator"><span class="progga-live-dot"></span> Live</span>
-              </div>
-              <div class="progga-card-body" style="padding:0;">
-                <div class="progga-table-wrapper" style="border:none;border-radius:0;">
-                  <table class="progga-table">
-                    <thead>
-                      <tr>
-                        <th>Order</th><th>Table</th><th>Items</th><th>Time</th><th>Status</th><th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>#128</td><td>T-03</td><td>3 items</td>
-                        <td><span style="color:var(--progga-warning);font-weight:700;">18 min</span></td>
-                        <td><span class="progga-badge progga-status-cooking">Cooking</span></td>
-                        <td><button class="progga-btn progga-btn-success progga-btn-sm">Ready</button></td>
-                      </tr>
-                      <tr>
-                        <td>#129</td><td>T-06</td><td>2 items</td>
-                        <td>8 min</td>
-                        <td><span class="progga-badge progga-status-pending">Pending</span></td>
-                        <td><button class="progga-btn progga-btn-outline progga-btn-sm">Start</button></td>
-                      </tr>
-                      <tr>
-                        <td>#130</td><td>T-09</td><td>5 items</td>
-                        <td>3 min</td>
-                        <td><span class="progga-badge progga-status-pending">Pending</span></td>
-                        <td><button class="progga-btn progga-btn-outline progga-btn-sm">Start</button></td>
-                      </tr>
-                      <tr>
-                        <td>#126</td><td>T-01</td><td>4 items</td>
-                        <td>25 min</td>
-                        <td><span class="progga-badge progga-status-ready">Ready</span></td>
-                        <td><button class="progga-btn progga-btn-primary progga-btn-sm">Deliver</button></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="progga-card-footer" style="text-align:right;">
-                <a href="kitchen.php" class="progga-btn progga-btn-outline progga-btn-sm">
-                  View Full Kitchen Board <i class="bi bi-arrow-right"></i>
-                </a>
-              </div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <div class="progga-stat-card">
+          <div class="progga-stat-icon primary"><i class="bi bi-receipt"></i></div>
+          <div class="progga-stat-info">
+            <div class="progga-stat-label">Total Orders (Today)</div>
+            <div class="progga-stat-value">{{ $todayOrdersCount }}</div>
+            <div class="progga-stat-change {{ $ordersChange >= 0 ? 'up' : 'down' }}">
+                <i class="bi {{ $ordersChange >= 0 ? 'bi-arrow-up-right' : 'bi-arrow-down-right' }}"></i>
+                {{ $ordersChange > 0 ? '+' : '' }}{{ $ordersChange }} vs yesterday
             </div>
           </div>
         </div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <div class="progga-stat-card">
+          <div class="progga-stat-icon warning"><i class="bi bi-layout-wtf"></i></div>
+          <div class="progga-stat-info">
+            <div class="progga-stat-label">Running Tables</div>
+            <div class="progga-stat-value">{{ $runningTables }} / {{ $totalTables }}</div>
+            <div class="progga-stat-change neutral"><i class="bi bi-dash"></i> {{ $availableTables }} available</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-        <!-- Recent Orders -->
+    <div class="row g-3 mb-4">
+      <div class="col-xl-8">
         <div class="progga-card">
           <div class="progga-card-header">
-            <div class="progga-card-title">Recent Orders</div>
-            <a href="reports.php" class="progga-btn progga-btn-outline progga-btn-sm">View All</a>
+            <div>
+              <div class="progga-card-title">Revenue Overview</div>
+              <div class="progga-card-subtitle">Daily revenue trend (Last 7 Days)</div>
+            </div>
+            <div class="progga-chart-toggle">
+              <button class="progga-chart-toggle-btn active" data-revenue-period="7">7 Days</button>
+            </div>
+          </div>
+          <div class="progga-card-body">
+            <div class="progga-chart-container" style="height:260px;">
+              <canvas id="revenueChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="progga-card" style="height:100%;">
+          <div class="progga-card-header">
+            <div class="progga-card-title">Order Status (This Month)</div>
+          </div>
+          <div class="progga-card-body" style="display:flex;flex-direction:column;align-items:center;">
+            <div class="progga-chart-container" style="height:220px;width:100%;">
+              <canvas id="orderStatusChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-xl-5">
+        <div class="progga-card">
+          <div class="progga-card-header">
+            <div class="progga-card-title">Top Selling Items</div>
+            <span class="progga-badge progga-badge-secondary">This Week</span>
+          </div>
+          <div class="progga-card-body">
+            <div class="progga-chart-container" style="height:220px;">
+              <canvas id="topItemsChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-7">
+        <div class="progga-card">
+          <div class="progga-card-header">
+            <div class="progga-card-title">
+              Kitchen Queue
+              <span class="progga-badge progga-badge-danger" style="margin-left:8px;">{{ $kitchenQueue->count() }} Pending</span>
+            </div>
+            <span class="progga-live-indicator"><span class="progga-live-dot"></span> Live</span>
           </div>
           <div class="progga-card-body" style="padding:0;">
             <div class="progga-table-wrapper" style="border:none;border-radius:0;">
               <table class="progga-table">
                 <thead>
                   <tr>
-                    <th>#</th><th>Table</th><th>Items</th><th>Waiter</th><th>Amount</th><th>Payment</th><th>Status</th><th>Time</th>
+                    <th>Order</th><th>Table</th><th>Items</th><th>Time</th><th>Status</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
+                  @forelse($kitchenQueue as $kq)
+                      @php
+                          $mins = \Carbon\Carbon::parse($kq->created_at)->diffInMinutes(now());
+                          $statusClass = strtolower($kq->status);
+                          if($kq->status == 'Ready') $statusClass = 'success';
+                      @endphp
                   <tr>
-                    <td>#130</td><td>T-09</td><td>5</td><td>Rafiq</td><td>৳1,840</td>
-                    <td><span class="progga-badge progga-badge-primary">Cash</span></td>
-                    <td><span class="progga-badge progga-status-pending">Pending</span></td>
-                    <td>3 min ago</td>
+                    <td>#{{ $kq->order_number }}</td>
+                    <td>{{ $kq->table->table_number ?? 'Takeaway' }}</td>
+                    <td>{{ $kq->orderDetails->sum('quantity') }} items</td>
+                    <td>
+                        @if($mins > 15 && $kq->status != 'Ready')
+                            <span style="color:var(--progga-warning);font-weight:700;">{{ $mins }} min</span>
+                        @else
+                            {{ $mins }} min
+                        @endif
+                    </td>
+                    <td><span class="progga-badge progga-status-{{ $statusClass }}">{{ $kq->status }}</span></td>
+                    <td>
+                        <a href="{{ route('kitchen.index') }}" class="progga-btn progga-btn-outline progga-btn-sm">View</a>
+                    </td>
                   </tr>
-                  <tr>
-                    <td>#129</td><td>T-06</td><td>2</td><td>Salma</td><td>৳620</td>
-                    <td><span class="progga-badge progga-badge-info">Card</span></td>
-                    <td><span class="progga-badge progga-status-cooking">Cooking</span></td>
-                    <td>8 min ago</td>
-                  </tr>
-                  <tr>
-                    <td>#128</td><td>T-03</td><td>3</td><td>Rafiq</td><td>৳1,120</td>
-                    <td><span class="progga-badge progga-badge-primary">Cash</span></td>
-                    <td><span class="progga-badge progga-status-cooking">Cooking</span></td>
-                    <td>18 min ago</td>
-                  </tr>
-                  <tr>
-                    <td>#127</td><td>T-11</td><td>6</td><td>Jamal</td><td>৳2,680</td>
-                    <td><span class="progga-badge progga-badge-warning">bKash</span></td>
-                    <td><span class="progga-badge progga-status-delivered">Delivered</span></td>
-                    <td>32 min ago</td>
-                  </tr>
-                  <tr>
-                    <td>#126</td><td>T-01</td><td>4</td><td>Salma</td><td>৳1,560</td>
-                    <td><span class="progga-badge progga-badge-primary">Cash</span></td>
-                    <td><span class="progga-badge progga-status-ready">Ready</span></td>
-                    <td>25 min ago</td>
-                  </tr>
-                  <tr>
-                    <td>#125</td><td>T-05</td><td>2</td><td>Jamal</td><td>৳760</td>
-                    <td><span class="progga-badge progga-badge-info">Card</span></td>
-                    <td><span class="progga-badge progga-status-delivered">Delivered</span></td>
-                    <td>45 min ago</td>
-                  </tr>
+                  @empty
+                  <tr><td colspan="6" class="text-center py-3">No pending orders in kitchen queue.</td></tr>
+                  @endforelse
                 </tbody>
               </table>
             </div>
           </div>
+          <div class="progga-card-footer" style="text-align:right;">
+            <a href="{{ route('kitchen.index') }}" class="progga-btn progga-btn-outline progga-btn-sm">
+              View Full Kitchen Board <i class="bi bi-arrow-right"></i>
+            </a>
+          </div>
         </div>
+      </div>
+    </div>
 
-      </main>
+    <div class="progga-card">
+      <div class="progga-card-header">
+        <div class="progga-card-title">Recent Orders</div>
+        <a href="{{ route('order.index') }}" class="progga-btn progga-btn-outline progga-btn-sm">View All</a>
+      </div>
+      <div class="progga-card-body" style="padding:0;">
+        <div class="progga-table-wrapper" style="border:none;border-radius:0;">
+          <table class="progga-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Table</th><th>Items</th><th>Waiter</th><th>Amount</th><th>Payment</th><th>Status</th><th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              @forelse($recentOrders as $order)
+                  @php
+                      $payClass = $order->payment_type == 'Cash' ? 'primary' : ($order->payment_type == 'Card' ? 'info' : 'warning');
+                      $stClass = strtolower($order->status);
+                      if($order->status == 'Completed') $stClass = 'primary';
+                      elseif($order->status == 'Cancelled') $stClass = 'danger';
+                      elseif($order->status == 'Ready') $stClass = 'success';
+                  @endphp
+              <tr>
+                <td><strong>#{{ $order->order_number }}</strong></td>
+                <td>{{ $order->table->table_number ?? 'Takeaway' }}</td>
+                <td>{{ $order->orderDetails->sum('quantity') }}</td>
+                <td>{{ $order->waiter->name ?? 'N/A' }}</td>
+                <td>৳{{ number_format($order->grand_total, 2) }}</td>
+                <td>
+                    <span class="progga-badge progga-badge-{{ $payClass }}">{{ $order->payment_type ?? 'Unpaid' }}</span>
+                </td>
+                <td>
+                    <span class="progga-badge progga-status-{{ $stClass }}">{{ $order->status }}</span>
+                </td>
+                <td>{{ $order->created_at->diffForHumans(null, true, true) }} ago</td>
+              </tr>
+              @empty
+              <tr><td colspan="8" class="text-center py-4">No recent orders found.</td></tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
+  </main>
 @endsection
 
 @section('script')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    // 1. Revenue Line Chart (Last 7 Days)
+    const ctxRevenue = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctxRevenue, {
+        type: 'line',
+        data: {
+            labels: @json($chartLabels),
+            datasets: [{
+                label: 'Revenue (৳)',
+                data: @json($chartData),
+                borderColor: '#21352a',
+                backgroundColor: 'rgba(33, 53, 42, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#d5aa65',
+                pointBorderColor: '#fff',
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // 2. Order Status Donut Chart
+    const ctxStatus = document.getElementById('orderStatusChart').getContext('2d');
+    new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+            labels: @json($statusLabels),
+            datasets: [{
+                data: @json($statusData),
+                backgroundColor: ['#d5aa65', '#17a2b8', '#1e7a4a', '#21352a', '#dc3545'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            cutout: '75%',
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true, padding: 20 } }
+            }
+        }
+    });
+
+    // 3. Top Items Bar Chart
+    const ctxTopItems = document.getElementById('topItemsChart').getContext('2d');
+    new Chart(ctxTopItems, {
+        type: 'bar',
+        data: {
+            labels: @json($topItemsLabels),
+            datasets: [{
+                label: 'Qty Sold',
+                data: @json($topItemsData),
+                backgroundColor: '#d5aa65',
+                borderRadius: 4,
+                barThickness: 16
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            indexAxis: 'y', // Horizontal bar
+            scales: {
+                x: { beginAtZero: true, grid: { borderDash: [4, 4] } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+});
+</script>
 @endsection

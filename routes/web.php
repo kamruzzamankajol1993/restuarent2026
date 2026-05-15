@@ -57,7 +57,64 @@ Route::post('/reset-password', [CustomResetPasswordController::class, 'resetPass
 
 Route::middleware(['auth'])->group(function () {
 
+// ==========================================
+    // Table QR Code Builder Routes
+    // ==========================================
+    Route::get('/qr-code-builder', [App\Http\Controllers\Admin\QrCodeController::class, 'index'])->name('qrcode.index');
+    Route::get('/qr-code-builder/get-tables/{zone_id}', [App\Http\Controllers\Admin\QrCodeController::class, 'getTables'])->name('qrcode.get_tables');
+    Route::post('/qr-code-builder/generate-pdf', [App\Http\Controllers\Admin\QrCodeController::class, 'generatePdf'])->name('qrcode.generate_pdf');
+// ==========================================
+    // Reports & Analytics Routes
+    // ==========================================
+    Route::get('reports', [App\Http\Controllers\Admin\ReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/export/pdf', [App\Http\Controllers\Admin\ReportController::class, 'exportPdf'])->name('reports.export.pdf');
+    Route::get('reports/export/csv', [App\Http\Controllers\Admin\ReportController::class, 'exportCsv'])->name('reports.export.csv');
 
+// ==========================================
+ // ==========================================
+    // Food Category AJAX
+    // ==========================================
+    Route::get('get-subcategories/{id}', [App\Http\Controllers\Admin\FoodCategoryController::class, 'getSubcategories']);
+
+    // ==========================================
+    // POS (Point of Sale) Routes
+    // ==========================================
+    Route::get('/pos', [App\Http\Controllers\Admin\PosController::class, 'index'])->name('pos.index');
+
+    // POS: Food & Category
+    Route::get('/pos/foods', [App\Http\Controllers\Admin\PosController::class, 'getFoods'])->name('pos.get_foods');
+    Route::get('/pos/get-addons/{id}', [App\Http\Controllers\Admin\PosController::class, 'getAddons'])->name('pos.get_addons');
+
+    // POS: Customer
+    Route::get('/pos/search-customer', [App\Http\Controllers\Admin\PosController::class, 'searchCustomer'])->name('pos.search_customer');
+    Route::post('/pos/store-customer', [App\Http\Controllers\Admin\PosController::class, 'storeCustomer'])->name('pos.store_customer');
+
+    // POS: Cart Management (AJAX)
+    Route::get('/pos/cart', [App\Http\Controllers\Admin\PosController::class, 'getCart'])->name('pos.cart.get');
+    Route::post('/pos/cart/add', [App\Http\Controllers\Admin\PosController::class, 'addToCart'])->name('pos.cart.add');
+    Route::post('/pos/cart/update', [App\Http\Controllers\Admin\PosController::class, 'updateCart'])->name('pos.cart.update');
+    Route::post('/pos/cart/remove', [App\Http\Controllers\Admin\PosController::class, 'removeFromCart'])->name('pos.cart.remove');
+    Route::post('/pos/cart/clear', [App\Http\Controllers\Admin\PosController::class, 'clearCart'])->name('pos.cart.clear');
+
+    // POS: Order & Payment
+    Route::post('/pos-cart-update-note', [App\Http\Controllers\Admin\PosController::class, 'updateNote'])->name('pos.cart.update_note');
+    Route::post('/pos-place-order', [App\Http\Controllers\Admin\PosController::class, 'placeOrder'])->name('pos.place_order'); // Send to Kitchen
+    Route::get('/pos/table-order/{table_id}', [App\Http\Controllers\Admin\PosController::class, 'getTableOrder'])->name('pos.get_table_order'); // Occupied Table Data
+    Route::post('/pos/payment', [App\Http\Controllers\Admin\PosController::class, 'completePayment'])->name('pos.complete_payment');
+
+Route::get('/pos/invoice/{id}', [App\Http\Controllers\Admin\PosController::class, 'printInvoice'])->name('pos.invoice');
+
+   // ==========================================
+    // Kitchen (KOT) Routes
+    // ==========================================
+    Route::get('/kitchen', [App\Http\Controllers\Admin\KitchenController::class, 'index'])->name('kitchen.index');
+    Route::get('/kitchen/get-live-orders', [App\Http\Controllers\Admin\KitchenController::class, 'getLiveOrders'])->name('kitchen.get_live_orders');
+    Route::post('/kitchen/update-status', [App\Http\Controllers\Admin\KitchenController::class, 'updateStatus'])->name('kitchen.update_status');
+
+    // KOT প্রিন্ট করার জন্য নতুন রাউট
+    Route::get('/kitchen/print-kot/{id}', [App\Http\Controllers\Admin\KitchenController::class, 'printKot'])->name('kitchen.print_kot');
+
+Route::get('get-subcategories/{id}', [App\Http\Controllers\Admin\FoodCategoryController::class, 'getSubcategories']);
 // Food Item Routes
     Route::resource('food-item', App\Http\Controllers\Admin\FoodItemController::class);
     Route::post('food-item-status/{id}', [App\Http\Controllers\Admin\FoodItemController::class, 'updateStatus'])->name('food-item.status');
@@ -68,13 +125,17 @@ Route::middleware(['auth'])->group(function () {
     // Course Type Routes
     Route::resource('course-type', App\Http\Controllers\Admin\CourseTypeController::class);
     Route::post('course-type-status/{id}', [App\Http\Controllers\Admin\CourseTypeController::class, 'updateStatus'])->name('course-type.status');
-
+Route::get('orders-export-pdf', [App\Http\Controllers\Admin\OrderController::class, 'exportPDF'])->name('order.export_pdf');
 
 // Food Category Routes
     Route::resource('food-category', FoodCategoryController::class);
 Route::post('food-category-status/{id}', [FoodCategoryController::class, 'updateStatus'])->name('food-category.status');
 
-
+// ==========================================
+    // Order Management Routes
+    // ==========================================
+    Route::get('orders', [App\Http\Controllers\Admin\OrderController::class, 'index'])->name('order.index');
+    Route::get('orders/{id}', [App\Http\Controllers\Admin\OrderController::class, 'show'])->name('order.show');
 // Cuisine Type Routes
     Route::resource('cuisine-type', App\Http\Controllers\Admin\CuisineTypeController::class);
     Route::post('cuisine-type-status/{id}', [App\Http\Controllers\Admin\CuisineTypeController::class, 'updateStatus'])->name('cuisine-type.status');

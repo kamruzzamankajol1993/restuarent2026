@@ -11,21 +11,35 @@ class Order extends Model
 
     protected $guarded = [];
 
-    // ৬ ডিজিট ইউনিক অর্ডার আইডি অটো-জেনারেট করার লজিক
+    // ইনভয়েস সেটিং অনুযায়ী অর্ডার আইডি জেনারেট করার লজিক
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($order) {
-            do {
-                $orderNumber = mt_rand(100000, 999999);
-            } while (self::where('order_number', $orderNumber)->exists());
+            // ডাটাবেজ থেকে ইনভয়েস সেটিং নিয়ে আসা
+            $invoiceSetting = \App\Models\InvoiceSetting::first();
 
-            $order->order_number = $orderNumber;
+            // যদি সেটিংসে starting_number থাকে তবে সেটি নিবে, নাহলে ডিফল্ট 1001 থেকে শুরু হবে
+            $startingNumber = $invoiceSetting && $invoiceSetting->starting_number ? $invoiceSetting->starting_number : 1001;
+
+            // ডাটাবেজের সর্বশেষ অর্ডারটি বের করা (যাতে আমরা সর্বোচ্চ নম্বরটি পাই)
+            $lastOrder = self::orderBy('id', 'desc')->first();
+
+            if ($lastOrder && $lastOrder->order_number >= $startingNumber) {
+                // যদি আগে কোনো অর্ডার থাকে, তবে সর্বশেষ অর্ডারের নাম্বারের সাথে ১ যোগ হবে
+                $order->order_number = $lastOrder->order_number + 1;
+            } else {
+                // যদি এটিই প্রথম অর্ডার হয় অথবা আগের নাম্বার starting_number এর চেয়ে ছোট হয়
+                $order->order_number = $startingNumber;
+            }
         });
     }
 
-    // রিলেশনশিপস
+    // ==========================================
+    // রিলেশনশিপস (Relationships)
+    // ==========================================
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);
@@ -44,5 +58,16 @@ class Order extends Model
     public function orderDetails()
     {
         return $this->hasMany(OrderDetail::class);
+    }
+
+    public function kots()
+    {
+        return $this->hasMany(OrderKot::class);
+    }
+
+    public function waiter()
+    {
+        // এটি Waiter মডেলের সাথে কানেক্ট করবে
+        return $this->belongsTo(Waiter::class, 'waiter_id');
     }
 }

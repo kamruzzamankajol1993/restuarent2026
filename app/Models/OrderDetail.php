@@ -16,4 +16,9 @@ class OrderDetail extends Model
     {
         return $this->belongsTo(Order::class);
     }
+
+    public function kot()
+{
+    return $this->belongsTo(OrderKot::class, 'order_kot_id');
+}
 }
