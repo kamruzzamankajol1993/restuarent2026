@@ -9,11 +9,28 @@
       </button>
     </div>
 
+    <div class="pos-table-stats">
+      <span class="pos-tstat avail"><span class="pos-tstat-dot"></span>{{ $availCount }} Available</span>
+      <span class="pos-tstat-sep">·</span>
+      <span class="pos-tstat occ"><span class="pos-tstat-dot"></span>{{ $occCount }} Occupied</span>
+      <span class="pos-tstat-sep">·</span>
+      <span class="pos-tstat res"><span class="pos-tstat-dot"></span>{{ $resCount }} Reserved</span>
+    </div>
+
+    <div class="pos-s1-filters">
+      <div class="progga-pos-table-filters" id="posTableSection">
+        <button class="progga-pos-filter-btn active" data-table-filter="all">All Tables</button>
+        <button class="progga-pos-filter-btn" data-table-filter="available">Available</button>
+        <button class="progga-pos-filter-btn" data-table-filter="occupied">Occupied</button>
+        <button class="progga-pos-filter-btn" data-table-filter="reserved">Reserved</button>
+      </div>
+    </div>
+
     <div class="pos-s1-grid" style="margin-top:20px;">
       <div class="progga-pos-table-grid" id="posTableGrid">
         @foreach($tables as $table)
             @php $statusClass = strtolower($table->initial_status); @endphp
-            <div class="progga-pos-table-card {{ $statusClass }}" data-table-id="{{ $table->id }}" data-table-num="{{ $table->table_number }}">
+            <div class="progga-pos-table-card {{ $statusClass }}" data-table-id="{{ $table->id }}" data-table-num="{{ $table->table_number }}" data-status="{{ $statusClass }}">
               <span class="progga-pos-table-icon">🪑</span>
               <div class="progga-pos-table-num">{{ $table->table_number }}</div>
               <div class="progga-pos-table-zone">{{ $table->zone->name ?? 'Main' }}</div>

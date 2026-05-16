@@ -43,18 +43,6 @@
     </div>
 
     <div class="progga-pos-total-row">
-        <span class="progga-pos-discount-label" style="display: flex; align-items: center; gap: 5px;">
-            Discount
-            <select class="progga-form-control" id="cart_discount_type" onchange="calculateGrandTotal()" style="width: 50px; padding: 2px 4px; height: 28px; font-size: 12px;">
-                <option value="fixed">৳</option>
-                <option value="percentage">%</option>
-            </select>
-            <input type="number" class="progga-form-control progga-pos-discount-input" id="cart_discount_value" placeholder="0" min="0" onkeyup="calculateGrandTotal()">
-        </span>
-        <span id="display_discount_amount">−৳0.00</span>
-    </div>
-
-    <div class="progga-pos-total-row">
         <span>Tax ({{ $vat_rate }}%)</span>
         <span id="display_vat">৳{{ number_format($vat_amount, 2) }}</span>
     </div>
@@ -93,31 +81,28 @@
 <script>
     // Toggle Takeaway Buttons
     if(currentOrder.order_type === 'takeaway') {
-        $('#takeawayActions').css('display', 'grid'); // ডিজাইনের grid সিস্টেম
+        $('#takeawayActions').css('display', 'grid');
         $('#btnSendToKitchen').hide();
     } else {
         $('#takeawayActions').hide();
         $('#btnSendToKitchen').show();
     }
 
-    // Grand Total Logic
-    function calculateGrandTotal() {
-        let subtotal = parseFloat("{{ $subtotal }}") || 0;
-        let vat_rate = parseFloat("{{ $vat_rate }}") || 0;
-        let service_rate = parseFloat("{{ $service_charge_rate }}") || 0;
+    // Grand Total & Mobile FAB Logic
+   function calculateGrandTotal() {
+        // ১. ব্লেড/পিএইচপি থেকে আসা বেসিক ভ্যালুগুলো নেওয়া
+        let subtotal = parseFloat("{{ $subtotal ?? 0 }}") || 0;
+        let vat_rate = parseFloat("{{ $vat_rate ?? 0 }}") || 0;
+        let service_rate = parseFloat("{{ $service_charge_rate ?? 0 }}") || 0;
 
-        let disc_type = $('#cart_discount_type').val();
-        let disc_val = parseFloat($('#cart_discount_value').val()) || 0;
+        // ২. ভ্যাট ও সার্ভিস চার্জ সরাসরি সাবটোটালের ওপর হিসাব করা
+        let vat = (subtotal * vat_rate) / 100;
+        let service = (subtotal * service_rate) / 100;
 
-        let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
-        let discounted_subtotal = subtotal - discount_amount;
+        // ৩. গ্র্যান্ড টোটাল হিসাব (কার্টে ডিসকাউন্ট নেই, তাই সরাসরি যোগ)
+        let grand = subtotal + vat + service;
 
-        let vat = (discounted_subtotal * vat_rate) / 100;
-        let service = (discounted_subtotal * service_rate) / 100;
-        let grand = discounted_subtotal + vat + service;
-
-        // UI Update
-        $('#display_discount_amount').text('−৳' + discount_amount.toFixed(2));
+        // ৪. সাইডবারে UI (Text) আপডেট করা
         $('#display_grand_total').text('৳' + grand.toFixed(2));
         $('#display_vat').text('৳' + vat.toFixed(2));
 
@@ -125,16 +110,42 @@
             $('#display_service').text('৳' + service.toFixed(2));
         }
 
-        // Global Variable Update for Place Order
-        currentOrder.discount_type = disc_type;
-        currentOrder.discount_value = disc_val;
-        currentOrder.grand_total = grand;
+        // ৫. মোবাইল ভিউয়ের Floating Cart Button (FAB) আপডেট করা
+        if($('#fabCartTotal').length) {
+            $('#fabCartTotal').text('৳' + grand.toFixed(2));
+        }
+
+        // ৬. গ্লোবাল currentOrder ভেরিয়েবল আপডেট করা
+        // (যেহেতু আপনি বলেছেন ডিসকাউন্ট শুধু মোডালে হবে, তাই এখানে ডিসকাউন্ট ০ রাখা হয়েছে)
+        if (typeof currentOrder !== 'undefined') {
+            currentOrder.discount_type = 'fixed';
+            currentOrder.discount_value = 0;
+            currentOrder.grand_total = grand;
+        }
     }
+
+    // Dynamic Cart Count for Mobile FAB
+    $(document).ready(function() {
+        let totalQty = 0;
+        @foreach($cart as $item)
+            totalQty += {{ $item['qty'] }};
+        @endforeach
+
+        if(totalQty > 0) {
+            $('#posCartFab').css('display', 'flex'); // Show FAB
+            $('#fabCartCount').text(totalQty);
+            $('#headerCartCount').text(totalQty).show();
+        } else {
+            $('#posCartFab').hide(); // Hide FAB if empty
+            $('#headerCartCount').hide();
+        }
+
+        // Initial Calculation
+        calculateGrandTotal();
+    });
 
     // Direct Pay Button Logic (For Takeaway)
     $('#btnDirectPay').on('click', function() {
-
-        // ১. কার্ট থেকে সমস্ত আইটেম একটি জাভাস্ক্রিপ্ট অ্যারেতে নেওয়া
         let itemsArr = [
             @forelse($cart as $cartId => $item)
             {
@@ -143,37 +154,24 @@
                 total: {{ ($item['price'] + $item['addon_total']) * $item['qty'] }}
             }{{ $loop->last ? '' : ',' }}
             @empty
-            // কার্ট ফাঁকা থাকলে কিছু হবে না
             @endforelse
         ];
 
-        // ২. যদি কার্টে কোনো আইটেম না থাকে তবে পেমেন্ট ওপেন হবে না
         if(itemsArr.length === 0) {
             Swal.fire('Empty Cart', 'Please add some items to the cart first.', 'warning');
             return;
         }
 
-        // ৩. পিএইচপি ভেরিয়েবল থেকে বেসিক হিসাবগুলো নেওয়া
         let subtotal = parseFloat("{{ $subtotal ?? 0 }}");
         let vatAmount = parseFloat("{{ $vat_amount ?? 0 }}");
         let serviceAmount = parseFloat("{{ $service_amount ?? 0 }}");
         let initialGrandTotal = parseFloat("{{ $grand_total ?? 0 }}");
 
-        // ৪. জাভাস্ক্রিপ্টের currentOrder অবজেক্ট থেকে লেটেস্ট ডিসকাউন্ট ও গ্র্যান্ড টোটাল নেওয়া
-        // (কারণ ইউজার ডিসকাউন্ট টাইপ/ভ্যালু পরিবর্তন করে থাকতে পারে যা এখনো ডাটাবেজে যায়নি)
-        let finalDiscount = currentOrder.discount_value || 0;
-        let finalGrandTotal = currentOrder.grand_total || initialGrandTotal;
-        let totalTaxAndService = vatAmount + serviceAmount;
-
-        // ৫. নতুন পেমেন্ট মোডাল ফাংশন কল করা
         window.openPaymentModal({
-            order_id: "", // টেক-অ্যাওয়ে এখনো প্লেস হয়নি, তাই ID ফাঁকা থাকবে
-            table_no: "Takeaway",
-            subtotal: subtotal,
-            discount: finalDiscount,
-            tax: totalTaxAndService,
-            grand_total: finalGrandTotal,
-            items: itemsArr
-        });
+    order_id: "",
+    table_no: "Takeaway",
+    subtotal: subtotal,
+    items: itemsArr
+});
     });
 </script>

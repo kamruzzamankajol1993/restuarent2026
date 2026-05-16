@@ -15,14 +15,28 @@
         </div>
         <button class="progga-btn progga-btn-outline progga-btn-sm" id="posBackToTables" type="button"><i class="bi bi-arrow-left"></i> Change Table</button>
       </div>
+
       <div class="progga-pos-food-grid" id="posFoodGrid">
           </div>
+
+      <div class="pos-cart-fab" id="posCartFab" style="display: none;">
+        <span class="pos-cart-fab-count" id="fabCartCount">0</span>
+        <span class="pos-cart-fab-label">View Cart</span>
+        <span class="pos-cart-fab-total" id="fabCartTotal">৳0.00</span>
+        <i class="bi bi-chevron-up"></i>
+      </div>
     </div>
 
     <div class="progga-pos-cart">
+      <div class="pos-cart-handle-bar d-md-none"></div>
+
       <div class="progga-pos-cart-header">
-        <div class="progga-pos-cart-title"><i class="bi bi-receipt"></i> Current Order</div>
+        <div class="progga-pos-cart-title">
+            <i class="bi bi-receipt"></i> Current Order <span class="badge bg-light text-dark ms-2" id="headerCartCount" style="display:none; font-size: 12px;">0</span>
+        </div>
+        <button class="pos-cart-mobile-close d-md-none" id="posMobileCartClose" type="button" style="background: none; border: none; color: white;"><i class="bi bi-x-lg"></i></button>
       </div>
+
       <div class="pos-cart-info" id="posCartMeta">
         <div class="pos-ci-row1">
           <span class="pos-ci-type" id="metaType">Dine-In</span>
@@ -35,7 +49,10 @@
           <span class="pos-ci-waiter" id="metaWaiter"><i class="bi bi-person-badge"></i> Unassigned</span>
         </div>
       </div>
-      <div id="posCartBody" style="display:flex; flex-direction:column; flex:1;">
+
+      <div id="posCartBody" style="display:flex; flex-direction:column; flex:1; overflow-y:auto;">
           </div>
     </div>
 </div>
+
+<div class="pos-mobile-backdrop" id="posMobileBackdrop" style="display: none;"></div>

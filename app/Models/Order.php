@@ -23,10 +23,13 @@ class Order extends Model
             // যদি সেটিংসে starting_number থাকে তবে সেটি নিবে, নাহলে ডিফল্ট 1001 থেকে শুরু হবে
             $startingNumber = $invoiceSetting && $invoiceSetting->starting_number ? $invoiceSetting->starting_number : 1001;
 
-            // ডাটাবেজের সর্বশেষ অর্ডারটি বের করা (যাতে আমরা সর্বোচ্চ নম্বরটি পাই)
-            $lastOrder = self::orderBy('id', 'desc')->first();
+            // ডাটাবেজের সর্বশেষ অর্ডারটি বের করা (যেগুলো QR- দিয়ে শুরু হয়নি)
+            $lastOrder = self::where('order_number', 'NOT LIKE', 'QR-%')
+                             ->orderBy('id', 'desc')
+                             ->first();
 
-            if ($lastOrder && $lastOrder->order_number >= $startingNumber) {
+            // চেক করা হচ্ছে অর্ডার নাম্বারটি আসলেই সংখ্যা (numeric) কিনা
+            if ($lastOrder && is_numeric($lastOrder->order_number) && $lastOrder->order_number >= $startingNumber) {
                 // যদি আগে কোনো অর্ডার থাকে, তবে সর্বশেষ অর্ডারের নাম্বারের সাথে ১ যোগ হবে
                 $order->order_number = $lastOrder->order_number + 1;
             } else {

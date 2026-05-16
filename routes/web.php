@@ -57,6 +57,15 @@ Route::post('/reset-password', [CustomResetPasswordController::class, 'resetPass
 
 Route::middleware(['auth'])->group(function () {
 
+
+
+// ==========================================
+    // Real-Time Notifications (QR Orders & Waiter Calls)
+    // ==========================================
+    Route::get('/notifications-check', [App\Http\Controllers\Admin\OrderController::class, 'checkNotifications'])->name('notifications.check');
+    Route::post('/notifications-accept-order', [App\Http\Controllers\Admin\OrderController::class, 'acceptQrOrder'])->name('notifications.accept_order');
+    Route::post('/notifications-resolve-waiter', [App\Http\Controllers\Admin\OrderController::class, 'resolveWaiterCall'])->name('notifications.resolve_waiter');
+
 // ==========================================
     // Table QR Code Builder Routes
     // ==========================================
@@ -101,9 +110,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pos-place-order', [App\Http\Controllers\Admin\PosController::class, 'placeOrder'])->name('pos.place_order'); // Send to Kitchen
     Route::get('/pos/table-order/{table_id}', [App\Http\Controllers\Admin\PosController::class, 'getTableOrder'])->name('pos.get_table_order'); // Occupied Table Data
     Route::post('/pos/payment', [App\Http\Controllers\Admin\PosController::class, 'completePayment'])->name('pos.complete_payment');
-
+Route::get('orders/{id}/details', [App\Http\Controllers\Admin\OrderController::class, 'details'])->name('order.details');
 Route::get('/pos/invoice/{id}', [App\Http\Controllers\Admin\PosController::class, 'printInvoice'])->name('pos.invoice');
-
+// নতুন রাউট: প্রি-পেমেন্ট ইনভয়েস (Guest Bill)
+    Route::get('/pos/pre-invoice/{id}', [App\Http\Controllers\Admin\PosController::class, 'printPreInvoice'])->name('pos.pre_invoice');
    // ==========================================
     // Kitchen (KOT) Routes
     // ==========================================

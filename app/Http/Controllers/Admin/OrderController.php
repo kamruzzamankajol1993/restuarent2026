@@ -119,4 +119,102 @@ class OrderController extends Controller
         return response($mpdf->Output($fileName, 'I'))->header('Content-Type', 'application/pdf');
     }
 
+
+    // ==========================================
+    // Real-Time Notification Logic
+    // ==========================================
+  public function checkNotifications()
+    {
+        // orderDetails সহ ডাটা আনা হচ্ছে যাতে মোডালে আইটেম দেখানো যায়
+        $newOrder = \App\Models\Order::with(['table', 'orderDetails'])
+            ->where('status', 'QR_Pending')
+            ->orderBy('id', 'asc')
+            ->first();
+
+        $waiterCall = \Illuminate\Support\Facades\DB::table('waiter_calls')
+            ->join('tables', 'waiter_calls.table_id', '=', 'tables.id')
+            ->where('waiter_calls.status', 'pending')
+            ->select('waiter_calls.*', 'tables.table_number')
+            ->orderBy('waiter_calls.id', 'asc')
+            ->first();
+
+        return response()->json([
+            'status'      => 'success',
+            'order'       => $newOrder,
+            'waiter_call' => $waiterCall
+        ]);
+    }
+
+   public function acceptQrOrder(Request $request)
+{
+    \Illuminate\Support\Facades\DB::beginTransaction();
+    try {
+        $order = \App\Models\Order::findOrFail($request->id);
+
+        // ১. কাস্টমার সেটআপ
+        $customerId = null;
+        if ($request->customer_type == 'existing') {
+            $customerId = $request->customer_id;
+        } elseif ($request->customer_type == 'new') {
+            $newCustomer = \App\Models\Customer::create([
+                'name' => $request->customer_name,
+                'phone' => $request->customer_phone
+            ]);
+            $customerId = $newCustomer->id;
+        }
+
+        // ২. অর্ডার আপডেট (স্ট্যাটাস, ওয়েটার, কাস্টমার এবং প্রিপারেশন টাইম)
+        $order->status = 'Pending';
+        $order->customer_id = $customerId;
+        $order->waiter_id = $request->waiter_id;
+        // প্রিপারেশন টাইম ডাটাবেজে সেভ করা হচ্ছে
+        $order->preparation_time = $request->preparation_time ?? 20;
+        $order->save();
+
+        // ৩. কিচেন KOT জেনারেট করা
+        $kotCount = \App\Models\OrderKot::where('order_id', $order->id)->count();
+        $kotId = \Illuminate\Support\Facades\DB::table('order_kots')->insertGetId([
+            'order_id' => $order->id,
+            'kot_number' => 'KOT-' . ($kotCount + 1),
+            'kitchen_status' => 'Pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // ৪. আইটেমগুলোকে KOT এর সাথে লিংক করা
+        \Illuminate\Support\Facades\DB::table('order_details')
+            ->where('order_id', $order->id)
+            ->update(['order_kot_id' => $kotId]);
+
+        // ৫. টেবিল Occupied করা
+        if ($order->table_id) {
+            \App\Models\Table::where('id', $order->table_id)->update(['initial_status' => 'Occupied']);
+        }
+
+        \Illuminate\Support\Facades\DB::commit();
+        return response()->json(['status' => 'success']);
+
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\DB::rollBack();
+        return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+}
+
+    public function resolveWaiterCall(Request $request)
+    {
+        \Illuminate\Support\Facades\DB::table('waiter_calls')
+            ->where('id', $request->id)
+            ->update(['status' => 'resolved']);
+
+        return response()->json(['status' => 'success']);
+    }
+
+    public function details($id)
+    {
+        // অর্ডারের সাথে জড়িত সমস্ত রিলেশনাল ডাটা ফেচ করা হচ্ছে
+        $order = Order::with(['customer', 'table', 'waiter', 'orderDetails', 'user'])->findOrFail($id);
+
+        // নতুন ফুল-পেজ ব্লেড ফাইল রিটার্ন করা হচ্ছে
+        return view('admin.order.show', compact('order'));
+    }
 }

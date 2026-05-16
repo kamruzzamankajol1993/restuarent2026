@@ -17,11 +17,7 @@
               Order Summary
             </div>
 
-            <div id="payModalItemsArea" style="max-height: 200px; overflow-y: auto;">
-              <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
-                <span class="progga-pay-summary-name text-muted">Items will be loaded here</span>
-              </div>
-            </div>
+            <div id="payModalItemsArea" style="max-height: 200px; overflow-y: auto;"></div>
 
             <div style="margin-top:14px; padding-top:10px; border-top:2px solid var(--progga-border-light);">
               <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
@@ -31,68 +27,217 @@
                 <span>Discount</span><span id="payDiscount">−৳0.00</span>
               </div>
               <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
-                <span>Tax/Service</span><span id="payTax">৳0.00</span>
+                <span>VAT</span><span id="payVat">৳0.00</span>
               </div>
-              <div class="progga-pos-total-row grand" style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; color: var(--progga-primary); margin-top: 8px; border-top: 2px solid #f1f1f1; padding-top: 8px;">
+              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
+                <span>Service Charge</span><span id="payService">৳0.00</span>
+              </div>
+              <div class="progga-pos-total-row grand" style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: var(--progga-primary); margin-top: 8px; border-top: 2px solid #f1f1f1; padding-top: 8px;">
                 <span>GRAND TOTAL</span><span id="payTotalAmount">৳0.00</span>
               </div>
+
+              <div class="progga-pos-total-row mt-2" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; color: #333;">
+                <span>Total Paid</span>
+                <input type="number" id="payTotalPaidAmount" name="total_paid_amount" form="payForm" class="form-control form-control-sm text-end" style="width: 120px; font-weight:bold; border: 1.5px solid var(--progga-border);" value="0" step="0.01">
+              </div>
+              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 900; color: #d33; margin-top: 6px;">
+                <span>DUE AMOUNT</span><span id="payDueAmount">৳0.00</span>
+              </div>
+
             </div>
           </div>
 
           <div class="col-md-7">
-            <div class="progga-form-label" style="font-weight:700; margin-bottom:12px; font-size: 14px; color: var(--progga-primary);">
-              Payment Method
-            </div>
-
             <form class="progga-pay-form" id="payForm">
               <input type="hidden" id="payOrderId" name="order_id">
 
-              <div class="progga-pay-method-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-                <input type="radio" id="payCash" name="payment_method" value="Cash" style="display: none;" checked>
-                <label for="payCash" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: 0.2s;">
-                  <i class="bi bi-cash-coin d-block" style="font-size: 20px; color: var(--progga-primary);"></i>
-                  <span style="font-size: 12px; font-weight: 700;">Cash</span>
-                </label>
-
-                <input type="radio" id="payCard" name="payment_method" value="Card" style="display: none;">
-                <label for="payCard" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: 0.2s;">
-                  <i class="bi bi-credit-card d-block" style="font-size: 20px; color: var(--progga-primary);"></i>
-                  <span style="font-size: 12px; font-weight: 700;">Card</span>
-                </label>
-
-                <input type="radio" id="payBkash" name="payment_method" value="Mobile Banking" style="display: none;">
-                <label for="payBkash" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: 0.2s;">
-                  <i class="bi bi-phone d-block" style="font-size: 20px; color: var(--progga-primary);"></i>
-                  <span style="font-size: 12px; font-weight: 700;">Mobile</span>
-                </label>
-              </div>
-
-              <div class="progga-pm-ref" id="transactionDiv" style="display: none;">
-                <div class="progga-form-group">
-                  <label class="progga-form-label" style="font-size: 12px; font-weight: 700; color: #555;">Transaction / Reference Number <span class="text-danger">*</span></label>
-                  <input type="text" name="transaction_id" class="form-control" placeholder="e.g. TXN-8473920" style="background: #fff; border: 1.5px solid var(--progga-border); border-radius: 8px;">
-                  <div class="progga-form-hint" style="font-size: 10.5px; color: #888; margin-top: 4px;">Enter the reference number from the payment terminal or mobile banking app.</div>
+              <div class="row mb-3">
+                <div class="col-6">
+                    <label style="font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px;">Discount Type</label>
+                    <select name="discount_type" id="modal_discount_type" class="form-control" style="border: 1.5px solid var(--progga-border); border-radius: 8px; font-size: 13px;" onchange="calculateModalTotal()">
+                        <option value="fixed">Fixed (৳)</option>
+                        <option value="percentage">Percentage (%)</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label style="font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px;">Discount Amount</label>
+                    <input type="number" name="discount_value" id="modal_discount_value" class="form-control" placeholder="0" min="0" style="border: 1.5px solid var(--progga-border); border-radius: 8px; font-size: 13px;" onkeyup="calculateModalTotal()">
                 </div>
               </div>
 
-              <button type="submit" class="progga-btn progga-btn-secondary progga-btn-lg w-100" style="margin-top:20px; padding: 12px; font-size: 14px; font-weight: 700; border-radius: 10px; border: none;">
-                <i class="bi bi-check-circle-fill"></i> Confirm Payment &amp; Print
-              </button>
+              <div class="progga-form-label" style="font-weight:700; margin-bottom:10px; font-size: 14px; color: var(--progga-primary);">
+                Payment Method
+              </div>
+
+              <div class="progga-pay-method-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
+                <input type="radio" id="payCash" name="payment_method" value="Cash" style="display: none;" checked>
+                <label for="payCash" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">
+                  <i class="bi bi-cash-coin d-block" style="font-size: 18px; color: var(--progga-primary);"></i>
+                  <span style="font-size: 11px; font-weight: 700;">Cash</span>
+                </label>
+
+                <input type="radio" id="payCard" name="payment_method" value="Card" style="display: none;">
+                <label for="payCard" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">
+                  <i class="bi bi-credit-card d-block" style="font-size: 18px; color: var(--progga-primary);"></i>
+                  <span style="font-size: 11px; font-weight: 700;">Card</span>
+                </label>
+
+                <input type="radio" id="payBkash" name="payment_method" value="Mobile Banking" style="display: none;">
+                <label for="payBkash" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">
+                  <i class="bi bi-phone d-block" style="font-size: 18px; color: var(--progga-primary);"></i>
+                  <span style="font-size: 11px; font-weight: 700;">Mobile</span>
+                </label>
+
+                <input type="radio" id="paySplit" name="payment_method" value="Split" style="display: none;">
+                <label for="paySplit" class="progga-pay-method-btn" style="border: 2px solid var(--progga-border); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">
+                  <i class="bi bi-pie-chart-fill d-block" style="font-size: 18px; color: var(--progga-primary);"></i>
+                  <span style="font-size: 11px; font-weight: 700;">Split</span>
+                </label>
+              </div>
+
+              <div id="splitPaymentDiv" style="display: none; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed #ccc;">
+                  <div class="row g-2">
+                      <div class="col-4">
+                          <label style="font-size: 11px; font-weight: 700; color: #555;">Cash</label>
+                          <input type="number" name="paid_in_cash" id="splitCash" class="form-control split-input p-1 text-center" value="0" step="0.01">
+                      </div>
+                      <div class="col-4">
+                          <label style="font-size: 11px; font-weight: 700; color: #555;">Card</label>
+                          <input type="number" name="paid_in_card" id="splitCard" class="form-control split-input p-1 text-center" value="0" step="0.01">
+                      </div>
+                      <div class="col-4">
+                          <label style="font-size: 11px; font-weight: 700; color: #555;">MFC (Mobile)</label>
+                          <input type="number" name="paid_in_mfc" id="splitMfc" class="form-control split-input p-1 text-center" value="0" step="0.01">
+                      </div>
+                  </div>
+              </div>
+
+              <div class="progga-pm-ref" id="transactionDiv" style="display: none; margin-bottom: 15px;">
+                  <label style="font-size: 12px; font-weight: 700; color: #555;">Transaction / Reference No</label>
+                  <input type="text" name="transaction_id" class="form-control" placeholder="e.g. TXN-8473920" style="border: 1.5px solid var(--progga-border); border-radius: 8px;">
+              </div>
+
+              <div class="d-flex gap-2" style="margin-top:20px;">
+                <button type="button" id="btnPreInvoice" class="progga-btn progga-btn-outline w-50" style="padding: 12px; font-size: 13px; font-weight: 700; border-radius: 10px;">
+                  <i class="bi bi-printer"></i> Print Pre-Invoice
+                </button>
+                <button type="submit" class="progga-btn progga-btn-secondary w-50" style="padding: 12px; font-size: 13px; font-weight: 700; border-radius: 10px; border: none;">
+                  <i class="bi bi-check-circle-fill"></i> Confirm Payment
+                </button>
+              </div>
+
             </form>
           </div>
-
         </div>
       </div>
-
     </div>
   </div>
 </div>
 
 <style>
-/* Payment Radio Button CSS */
 input[type="radio"]:checked + .progga-pay-method-btn {
     border-color: var(--progga-primary) !important;
     background: rgba(33, 53, 42, 0.05) !important;
     box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 </style>
+
+<script>
+// ===============================================
+// Due and Total Paid Calculation Logic
+// ===============================================
+window.updateDueAmount = function() {
+    let grand = parseFloat($('#payTotalAmount').text().replace('৳', '')) || 0;
+    let method = $('input[name="payment_method"]:checked').val();
+    let totalPaid = 0;
+
+    if (method === 'Split') {
+        let cash = parseFloat($('#splitCash').val()) || 0;
+        let card = parseFloat($('#splitCard').val()) || 0;
+        let mfc = parseFloat($('#splitMfc').val()) || 0;
+        totalPaid = cash + card + mfc;
+
+        // Auto-fill Total Paid input and make it readonly
+        $('#payTotalPaidAmount').val(totalPaid.toFixed(2)).prop('readonly', true);
+    } else {
+        $('#payTotalPaidAmount').prop('readonly', false);
+        totalPaid = parseFloat($('#payTotalPaidAmount').val()) || 0;
+    }
+
+    let due = grand - totalPaid;
+    if(due < 0) due = 0; // ওভারপেমেন্ট হলে Due 0 দেখাবে
+
+    $('#payDueAmount').text('৳' + due.toFixed(2));
+};
+
+// যখন ম্যানুয়াল টোটাল পেইড বা স্প্লিট ইনপুটে টাইপ করবে তখন ডাইনামিক চেঞ্জ হবে
+$(document).on('keyup change', '#payTotalPaidAmount, .split-input', window.updateDueAmount);
+
+$(document).on('change', 'input[name="payment_method"]', function() {
+    let method = $(this).val();
+
+    if(method === 'Split') {
+        $('#splitPaymentDiv').slideDown('fast');
+        $('#transactionDiv').slideUp('fast');
+    } else if(method === 'Card' || method === 'Mobile Banking') {
+        $('#splitPaymentDiv').slideUp('fast');
+        $('#transactionDiv').slideDown('fast');
+        // অন্য পেমেন্ট মেথড হলে Grand Total টাই ডিফল্ট Paid Amount হিসেবে বসবে
+        $('#payTotalPaidAmount').val(parseFloat($('#payTotalAmount').text().replace('৳', '')).toFixed(2));
+    } else {
+        $('#splitPaymentDiv').slideUp('fast');
+        $('#transactionDiv').slideUp('fast');
+        $('#payTotalPaidAmount').val(parseFloat($('#payTotalAmount').text().replace('৳', '')).toFixed(2));
+    }
+    window.updateDueAmount();
+});
+
+// ===============================================
+// Pre-Invoice Button Logic
+// ===============================================
+$(document).on('click', '#btnPreInvoice', function() {
+    let orderId = $('#payOrderId').val();
+    if(!orderId) {
+        Swal.fire('Info', 'For Takeaway without table, please place the order first to generate a pre-invoice.', 'info');
+        return;
+    }
+
+    let discType = $('#modal_discount_type').val();
+    let discVal = $('#modal_discount_value').val() || 0;
+
+    // নতুন ট্যাবে প্রি-ইনভয়েস ওপেন করা (লাইভ ডিসকাউন্ট ভ্যালু সহ)
+    let url = "{{ url('/pos/pre-invoice') }}/" + orderId + "?disc_type=" + discType + "&disc_val=" + discVal;
+    window.open(url, '_blank');
+});
+
+// Update calculateModalTotal to run Due calculation at the end
+let oldCalculateModalTotal = window.calculateModalTotal;
+window.calculateModalTotal = function() {
+    // আগের বেসিক হিসাব
+    let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
+    let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
+    let service_rate = parseFloat("{{ $taxSettingServiceCharge ?? 0 }}");
+
+    let disc_type = $('#modal_discount_type').val();
+    let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
+
+    let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
+
+    let vat = (subtotal * vat_rate) / 100;
+    let service = (subtotal * service_rate) / 100;
+    let grand = (subtotal + vat + service) - discount_amount;
+
+    $('#payDiscount').text('−৳' + discount_amount.toFixed(2));
+    $('#payVat').text('৳' + vat.toFixed(2));
+    $('#payService').text('৳' + service.toFixed(2));
+    $('#payTotalAmount').text('৳' + grand.toFixed(2));
+
+    // ডিফল্ট পেইড এমাউন্ট ফিল করা (যদি স্প্লিট না হয়)
+    if ($('input[name="payment_method"]:checked').val() !== 'Split') {
+        $('#payTotalPaidAmount').val(grand.toFixed(2));
+    }
+
+    // Due আপডেট করা
+    window.updateDueAmount();
+};
+</script>

@@ -62,9 +62,13 @@
             </td>
             <td><span class="progga-order-time">{{ $order->created_at->diffForHumans() }}</span></td>
             <td>
-              <div class="progga-table-actions">
+              <div class="progga-table-actions d-flex align-items-center gap-1">
                 <button class="progga-btn progga-btn-outline progga-btn-icon progga-btn-sm" title="View Order" onclick="viewOrder({{ $order->id }})"><i class="bi bi-eye"></i></button>
                 <a href="{{ route('pos.invoice', $order->id) }}" target="_blank" class="progga-btn progga-btn-outline progga-btn-icon progga-btn-sm" title="Print Receipt"><i class="bi bi-printer"></i></a>
+
+             <a href="{{ route('order.details', $order->id) }}" class="progga-btn progga-btn-outline progga-btn-icon progga-btn-sm" title="Show Full Details" style="color: var(--progga-primary); border-color: var(--progga-primary);">
+                    <i class="bi bi-card-list"></i>
+                </a>
               </div>
             </td>
           </tr>

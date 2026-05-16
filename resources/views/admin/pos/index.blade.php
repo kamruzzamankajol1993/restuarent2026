@@ -368,38 +368,62 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
     //     openPaymentModal(null, total);
     // });
 
-    window.openPaymentModal = function(data) {
-    // ১. অফক্যানভাস বন্ধ করা
+   window.openPaymentModal = function(data) {
     let oc = document.getElementById('tableOrderOffcanvas');
     if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
 
-    // ২. মোডালে ডাটা বসানো
     $('#payOrderId').val(data.order_id || '');
     $('#payTableLabel').text(data.table_no || 'Takeaway');
 
-    $('#paySubtotal').text('৳' + parseFloat(data.subtotal || 0).toFixed(2));
-    $('#payDiscount').text('−৳' + parseFloat(data.discount || 0).toFixed(2));
-    $('#payTax').text('৳' + parseFloat(data.tax || 0).toFixed(2));
-    $('#payTotalAmount').text('৳' + parseFloat(data.grand_total || 0).toFixed(2));
+    // ডাটাবেজ থেকে আসা সাবটোটাল স্টোর করা
+    $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
 
-    // ৩. অর্ডার করা আইটেম লিস্ট জেনারেট করা
+    $('#paySubtotal').text('৳' + parseFloat(data.subtotal || 0).toFixed(2));
+
+    $('#modal_discount_type').val('fixed');
+    $('#modal_discount_value').val('');
+
+    // আইটেম লিস্ট মোডালে লোড করা
     let itemsHtml = '';
     if(data.items && data.items.length > 0) {
         data.items.forEach(item => {
             itemsHtml += `
-            <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 5px;">
-                <span class="progga-pay-summary-name" style="flex: 1; font-weight: 600; color: #444;">${item.name}</span>
-                <span class="progga-pay-summary-qty" style="width: 40px; text-align: center; color: #777;">×${item.qty}</span>
-                <span class="progga-pay-summary-price" style="font-weight: 700; color: var(--progga-primary);">৳${parseFloat(item.total).toFixed(2)}</span>
+            <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+                <span class="text-muted">${item.name} ×${item.qty}</span>
+                <span style="font-weight: 600;">৳${parseFloat(item.total).toFixed(2)}</span>
             </div>`;
         });
     } else {
-        itemsHtml = `<div class="text-muted text-center" style="font-size:12px;">No items found</div>`;
+        itemsHtml = '<div class="text-muted text-center" style="font-size:12px;">No items</div>';
     }
     $('#payModalItemsArea').html(itemsHtml);
 
-    // ৪. পেমেন্ট মোডাল ওপেন করা
+    calculateModalTotal();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
+}
+
+// master.blade.php এর ভেতরে
+window.calculateModalTotal = function() {
+    let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
+    let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
+    let service_rate = parseFloat("{{ $taxSettingServiceCharge ?? 0 }}");
+
+    let disc_type = $('#modal_discount_type').val();
+    let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
+
+    let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
+
+    // ভ্যাট ও সার্ভিস চার্জ সরাসরি সাবটোটালের ওপর
+    let vat = (subtotal * vat_rate) / 100;
+    let service = (subtotal * service_rate) / 100;
+
+    // গ্র্যান্ড টোটাল হিসাব
+    let grand = (subtotal + vat + service) - discount_amount;
+
+    $('#payDiscount').text('−৳' + discount_amount.toFixed(2));
+    $('#payVat').text('৳' + vat.toFixed(2));
+    $('#payService').text('৳' + service.toFixed(2));
+    $('#payTotalAmount').text('৳' + grand.toFixed(2));
 }
 
    // পেমেন্ট ফর্ম সাবমিট লজিক
@@ -408,40 +432,27 @@ $(document).on('submit', '#payForm', function(e) {
 
     let btn = $(this).find('button[type="submit"]');
     let originalHtml = btn.html();
-
-    // ডাবল ক্লিক রোধ করতে বাটন ডিজেবল এবং লোডিং স্পিনার
     btn.html('<i class="spinner-border spinner-border-sm"></i> Processing...').prop('disabled', true);
 
-    // ফর্মের ডাটা নেওয়া এবং CSRF টোকেন যুক্ত করা
-    let formData = $(this).serialize() + '&_token=' + $('meta[name="csrf-token"]').attr('content');
+    // ফর্মের ডাটা (পেমেন্ট মেথড, ট্রানজেকশন আইডি এবং ডিসকাউন্ট ডাটা)
+    let formData = $(this).serialize();
 
     $.ajax({
         url: "{{ route('pos.complete_payment') }}",
         type: "POST",
-        data: formData,
+        data: formData + '&_token=' + $('meta[name="csrf-token"]').attr('content'),
         success: function(res) {
             if(res.status === 'success') {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Paid!',
-                    text: 'Payment Successful! Redirecting to invoice...',
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    if(res.redirect_url) {
-                        window.location.href = res.redirect_url;
-                    } else {
-                        window.location.reload();
-                    }
+                Swal.fire({ icon: 'success', title: 'Paid!', timer: 1500, showConfirmButton: false }).then(() => {
+                    window.location.href = res.redirect_url;
                 });
             } else {
                 Swal.fire('Error', res.message, 'error');
                 btn.html(originalHtml).prop('disabled', false);
             }
         },
-        error: function(xhr) {
-            console.error("Payment Error:", xhr.responseText);
-            Swal.fire('Error', 'Server error during payment. Check console.', 'error');
+        error: function() {
+            Swal.fire('Error', 'Server error. Please try again.', 'error');
             btn.html(originalHtml).prop('disabled', false);
         }
     });
@@ -490,6 +501,43 @@ $(document).on('submit', '#payForm', function(e) {
     showStep(2);
     loadCart();
 });
+
+// ==========================================
+    // TABLE FILTERING TABS
+    // ==========================================
+    $(document).on('click', '.progga-pos-filter-btn', function() {
+        // সব বাটন থেকে active ক্লাস সরিয়ে ক্লিক করা বাটনে অ্যাড করা
+        $('.progga-pos-filter-btn').removeClass('active');
+        $(this).addClass('active');
+
+        // ফিল্টারের ভ্যালু নেওয়া (all, available, occupied, reserved)
+        let filterValue = $(this).data('table-filter');
+
+        // টেবিল ফিল্টার লজিক
+        if(filterValue === 'all') {
+            $('.progga-pos-table-card').fadeIn('fast');
+        } else {
+            $('.progga-pos-table-card').hide();
+            $('.progga-pos-table-card[data-status="' + filterValue + '"]').fadeIn('fast');
+        }
+    });
+
+    // ==========================================
+    // MOBILE CART TOGGLE LOGIC
+    // ==========================================
+    $(document).on('click', '#posCartFab', function() {
+        // progga-style.css এর ক্লাস অনুযায়ী কার্ট ওপেন হবে
+        $('.progga-pos-cart').addClass('show');
+        $('#posMobileBackdrop').fadeIn('fast');
+        $('body').addClass('progga-pos-overflow-lock'); // ব্যাকগ্রাউন্ড স্ক্রল অফ
+    });
+
+    $(document).on('click', '#posMobileCartClose, #posMobileBackdrop', function() {
+        // ক্লোজ বাটনে বা ব্যাকড্রপে ক্লিক করলে কার্ট হাইড হবে
+        $('.progga-pos-cart').removeClass('show');
+        $('#posMobileBackdrop').fadeOut('fast');
+        $('body').removeClass('progga-pos-overflow-lock'); // ব্যাকগ্রাউন্ড স্ক্রল অন
+    });
 </script>
 
 @endsection

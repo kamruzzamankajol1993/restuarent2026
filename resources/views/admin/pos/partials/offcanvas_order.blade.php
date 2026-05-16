@@ -111,15 +111,12 @@
             </button>
         @else
             <button class="progga-btn progga-btn-primary" id="ocPayBtn" style="flex: 1;"
-                    onclick='openPaymentModal({
-                        order_id: "{{ $order->id }}",
-                        table_no: "{{ $order->table->table_number ?? 'Takeaway' }}",
-                        subtotal: {{ $order->subtotal ?? 0 }},
-                        discount: {{ $order->discount_amount ?? 0 }},
-                        tax: {{ ($order->vat_tax ?? 0) + ($order->service_charge ?? 0) }},
-                        grand_total: {{ $order->grand_total ?? 0 }},
-                        items: @json($payItems)
-                    })'>
+                   onclick='openPaymentModal({
+    order_id: "{{ $order->id }}",
+    table_no: "{{ $order->table->table_number ?? 'Takeaway' }}",
+    subtotal: {{ $order->subtotal ?? 0 }},
+    items: @json($payItems)
+})'>
                 <i class="bi bi-credit-card"></i> Payment
             </button>
         @endif

@@ -8,6 +8,8 @@ use App\Models\RestaurantSetting;
 use App\Models\TaxSetting;
 use App\Models\InvoiceSetting;
 use App\Models\PosSetting;
+use App\Models\Waiter;     // নতুন যুক্ত করা হলো
+use App\Models\Customer;   // নতুন যুক্ত করা হলো
 use Exception;
 
 class AppServiceProvider extends ServiceProvider
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
             $taxSetting        = TaxSetting::first();
             $invoiceSetting    = InvoiceSetting::first();
             $posSetting        = PosSetting::first();
+
+            // POS এবং Master ফাইলের মোডালের জন্য Waiter ও Customer ফেচ করা হচ্ছে
+            $waiters   = Waiter::where('status', 1)->get();
+            $customers = Customer::orderBy('name', 'asc')->get();
 
             // ==========================================
             // ২. Restaurant Settings এর ভ্যারিয়েবলগুলো
@@ -118,6 +124,10 @@ class AppServiceProvider extends ServiceProvider
             View::share('taxSetting', $taxSetting);
             View::share('invoiceSetting', $invoiceSetting);
             View::share('posSetting', $posSetting);
+
+            // রিয়েল-টাইম মোডালের জন্য গ্লোবাল ভেরিয়েবল
+            View::share('waiters', $waiters);
+            View::share('customers', $customers);
 
         } catch (Exception $e) {
             // ডাটাবেস মাইগ্রেট করার সময় বা টেবিল না থাকলে যাতে অ্যাপ্লিকেশন ক্র্যাশ না করে

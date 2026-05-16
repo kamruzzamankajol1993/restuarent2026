@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Session;
 
 class PosController extends Controller
 {
-    public function index()
+   public function index()
     {
         $posSetting = DB::table('pos_settings')->first();
         $categories = FoodCategory::whereNull('parent_category_id')->where('status', 1)->orderBy('sort_order', 'asc')->get();
@@ -26,7 +26,21 @@ class PosController extends Controller
         $waiters = Waiter::where('status', 1)->get();
         $customers = Customer::orderBy('name', 'asc')->get();
 
-        return view('admin.pos.index', compact('categories', 'tables', 'waiters', 'customers', 'posSetting'));
+        // ডাটাবেজের স্ট্যাটাস ছোট/বড় হাতের যাই থাকুক, তা ঠিকভাবে কাউন্ট করার লজিক
+        $availCount = $tables->filter(function($table) {
+            return strtolower($table->initial_status) === 'available';
+        })->count();
+
+        $occCount = $tables->filter(function($table) {
+            return strtolower($table->initial_status) === 'occupied';
+        })->count();
+
+        $resCount = $tables->filter(function($table) {
+            return strtolower($table->initial_status) === 'reserved';
+        })->count();
+
+        // compact এর মধ্যে নতুন ভেরিয়েবলগুলো পাস করা হলো
+        return view('admin.pos.index', compact('categories', 'tables', 'waiters', 'customers', 'posSetting', 'availCount', 'occCount', 'resCount'));
     }
 
     public function getFoods(Request $request)
@@ -162,139 +176,139 @@ class PosController extends Controller
     }
 
     public function placeOrder(Request $request)
-{
-    $cartKey = $this->getCartKey($request);
-    $cart = Session::get($cartKey, []);
+    {
+        $cartKey = $this->getCartKey($request);
+        $cart = Session::get($cartKey, []);
 
-    if (count($cart) == 0) {
-        return response()->json(['status' => 'error', 'message' => 'Cart is empty!']);
-    }
-
-    DB::beginTransaction();
-    try {
-        // ১. কার্টে থাকা নতুন আইটেমের টোটাল হিসাব করা
-        $current_cart_subtotal = 0;
-        foreach ($cart as $item) {
-            $current_cart_subtotal += ($item['price'] + $item['addon_total']) * $item['qty'];
+        if (count($cart) == 0) {
+            return response()->json(['status' => 'error', 'message' => 'Cart is empty!']);
         }
 
-        $taxSetting = DB::table('tax_settings')->first();
-        $vat_rate = $taxSetting->vat_rate ?? 0;
-        $service_charge_rate = $taxSetting->service_charge ?? 0;
+        DB::beginTransaction();
+        try {
+            // ১. কার্টে থাকা নতুন আইটেমের টোটাল হিসাব করা
+            $current_cart_subtotal = 0;
+            foreach ($cart as $item) {
+                $current_cart_subtotal += ($item['price'] + $item['addon_total']) * $item['qty'];
+            }
 
-        $discount_value = $request->discount_value ?? 0;
-        $discount_type = $request->discount_type ?? 'fixed';
+            $taxSetting = DB::table('tax_settings')->first();
+            $vat_rate = $taxSetting->vat_rate ?? 0;
+            $service_charge_rate = $taxSetting->service_charge ?? 0;
 
-        // ২. চেক করা: এটি কি পুরনো অর্ডার? (Add More Food)
-        if ($request->filled('order_id')) {
-            $order = Order::findOrFail($request->order_id);
+            $discount_value = $request->discount_value ?? 0;
+            $discount_type = $request->discount_type ?? 'fixed';
 
-            // পুরনো অর্ডারের সাথে নতুন কার্টের বিল যোগ করা
-            $total_subtotal = $order->subtotal + $current_cart_subtotal;
+            // ২. চেক করা: এটি কি পুরনো অর্ডার? (Add More Food)
+            if ($request->filled('order_id')) {
+                $order = Order::findOrFail($request->order_id);
 
-            $discount_amount = ($discount_type == 'percentage')
-                ? ($total_subtotal * $discount_value) / 100
-                : $discount_value;
+                // পুরনো অর্ডারের সাথে নতুন কার্টের বিল যোগ করা
+                $total_subtotal = $order->subtotal + $current_cart_subtotal;
 
-            $discounted_subtotal = $total_subtotal - $discount_amount;
-            $tax = ($discounted_subtotal * $vat_rate) / 100;
-            $service_charge = ($discounted_subtotal * $service_charge_rate) / 100;
-            $grand_total = $discounted_subtotal + $tax + $service_charge;
+                $discount_amount = ($discount_type == 'percentage')
+                    ? ($total_subtotal * $discount_value) / 100
+                    : $discount_value;
 
-            // শুধু বিল আপডেট হবে, কাস্টমার/ওয়েটার আগেরটাই থাকবে
-            $order->update([
-                'subtotal' => $total_subtotal,
-                'discount_amount' => $discount_amount,
-                'discount_type' => $discount_type,
-                'vat_tax' => $tax,
-                'service_charge' => $service_charge,
-                'grand_total' => $grand_total,
-                'preparation_time' => $request->preparation_time,
-                'due' => $grand_total,
-            ]);
+                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ
+                $tax = ($total_subtotal * $vat_rate) / 100;
+                $service_charge = ($total_subtotal * $service_charge_rate) / 100;
+                $grand_total = ($total_subtotal + $tax + $service_charge) - $discount_amount;
 
-        } else {
-            // ৩. যদি নতুন অর্ডার হয় (ফ্রেশ কাস্টমার)
-            $discount_amount = ($discount_type == 'percentage')
-                ? ($current_cart_subtotal * $discount_value) / 100
-                : $discount_value;
+                // শুধু বিল আপডেট হবে, কাস্টমার/ওয়েটার আগেরটাই থাকবে
+                $order->update([
+                    'subtotal' => $total_subtotal,
+                    'discount_amount' => $discount_amount,
+                    'discount_type' => $discount_type,
+                    'vat_tax' => $tax,
+                    'service_charge' => $service_charge,
+                    'grand_total' => $grand_total,
+                    'preparation_time' => $request->preparation_time ?? 20, // ফিক্সড প্রিপারেশন টাইম
+                    'due' => $grand_total,
+                ]);
 
-            $discounted_subtotal = $current_cart_subtotal - $discount_amount;
-            $tax = ($discounted_subtotal * $vat_rate) / 100;
-            $service_charge = ($discounted_subtotal * $service_charge_rate) / 100;
-            $grand_total = $discounted_subtotal + $tax + $service_charge;
+            } else {
+                // ৩. যদি নতুন অর্ডার হয় (ফ্রেশ কাস্টমার)
+                $discount_amount = ($discount_type == 'percentage')
+                    ? ($current_cart_subtotal * $discount_value) / 100
+                    : $discount_value;
 
-            $customerId = null;
-            if ($request->is_walk_in == '0') {
-                if ($request->customer_id) {
-                    $customerId = $request->customer_id;
-                } else if ($request->customer_name) {
-                    $newCustomer = Customer::create(['name' => $request->customer_name, 'phone' => $request->customer_phone]);
-                    $customerId = $newCustomer->id;
+                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ
+                $tax = ($current_cart_subtotal * $vat_rate) / 100;
+                $service_charge = ($current_cart_subtotal * $service_charge_rate) / 100;
+                $grand_total = ($current_cart_subtotal + $tax + $service_charge) - $discount_amount;
+
+                $customerId = null;
+                if ($request->is_walk_in == '0') {
+                    if ($request->customer_id) {
+                        $customerId = $request->customer_id;
+                    } else if ($request->customer_name) {
+                        $newCustomer = Customer::create(['name' => $request->customer_name, 'phone' => $request->customer_phone]);
+                        $customerId = $newCustomer->id;
+                    }
+                }
+
+                // নতুন অর্ডার তৈরি
+                $order = Order::create([
+                    'customer_id' => $customerId,
+                    'table_id' => $request->order_type == 'takeaway' ? null : $request->table_id,
+                    'waiter_id' => $request->waiter_id,
+                    'user_id' => auth()->id() ?? 1,
+                    'order_type' => ($request->order_type == 'dine_in') ? 'Dine-In' : 'Takeaway',
+                    'subtotal' => $current_cart_subtotal,
+                    'discount_amount' => $discount_amount,
+                    'discount_type' => $discount_type,
+                    'vat_tax' => $tax,
+                    'service_charge' => $service_charge,
+                    'grand_total' => $grand_total,
+                    'due' => $grand_total,
+                    'status' => 'Pending',
+                    'notes' => $request->order_notes,
+                    'order_time' => now(),
+                    'preparation_time' => $request->preparation_time ?? 20 // ফিক্সড প্রিপারেশন টাইম
+                ]);
+
+                if ($request->order_type == 'dine_in') {
+                    Table::where('id', $request->table_id)->update(['initial_status' => 'Occupied']);
                 }
             }
 
-            // নতুন অর্ডার তৈরি
-            $order = Order::create([
-                'customer_id' => $customerId,
-                'table_id' => $request->order_type == 'takeaway' ? null : $request->table_id,
-                'waiter_id' => $request->waiter_id,
-                'user_id' => auth()->id() ?? 1,
-                'order_type' => ($request->order_type == 'dine_in') ? 'Dine-In' : 'Takeaway',
-                'subtotal' => $current_cart_subtotal,
-                'discount_amount' => $discount_amount,
-                'discount_type' => $discount_type,
-                'vat_tax' => $tax,
-                'service_charge' => $service_charge,
-                'grand_total' => $grand_total,
-                'due' => $grand_total,
-                'status' => 'Pending',
-                'notes' => $request->order_notes,
-                'order_time' => now(),
-                'preparation_time' => $request->preparation_time || 20
+            // ৪. এই অর্ডারের আন্ডারে নতুন KOT জেনারেট করা
+            $kotCount = OrderKot::where('order_id', $order->id)->count();
+            $kot = OrderKot::create([
+                'order_id' => $order->id, // একই অর্ডার আইডি
+                'kot_number' => 'KOT-' . ($kotCount + 1), // আগে KOT-1 থাকলে এটা KOT-2 হবে
+                'kitchen_status' => 'Pending'
             ]);
 
-            if ($request->order_type == 'dine_in') {
-                Table::where('id', $request->table_id)->update(['initial_status' => 'Occupied']);
+            // ৫. নতুন আইটেমগুলো শুধুমাত্র নতুন KOT-তে সেভ করা
+            foreach ($cart as $item) {
+                OrderDetail::create([
+                    'order_id' => $order->id,       // একই অর্ডার আইডি
+                    'order_kot_id' => $kot->id,     // নতুন KOT আইডি
+                    'product_id' => $item['food_id'],
+                    'product_name' => $item['name'],
+                    'quantity' => $item['qty'],
+                    'price' => $item['price'],
+                    'subtotal' => ($item['price'] + $item['addon_total']) * $item['qty'],
+                    'addons' => json_encode($item['addons']),
+                    'food_note' => $item['note'] ?? null
+                ]);
             }
-        }
 
-        // ৪. এই অর্ডারের আন্ডারে নতুন KOT জেনারেট করা
-        $kotCount = OrderKot::where('order_id', $order->id)->count();
-        $kot = OrderKot::create([
-            'order_id' => $order->id, // একই অর্ডার আইডি
-            'kot_number' => 'KOT-' . ($kotCount + 1), // আগে KOT-1 থাকলে এটা KOT-2 হবে
-            'kitchen_status' => 'Pending'
-        ]);
+            Session::forget($cartKey);
+            DB::commit();
 
-        // ৫. নতুন আইটেমগুলো শুধুমাত্র নতুন KOT-তে সেভ করা
-        foreach ($cart as $item) {
-            OrderDetail::create([
-                'order_id' => $order->id,       // একই অর্ডার আইডি
-                'order_kot_id' => $kot->id,     // নতুন KOT আইডি
-                'product_id' => $item['food_id'],
-                'product_name' => $item['name'],
-                'quantity' => $item['qty'],
-                'price' => $item['price'],
-                'subtotal' => ($item['price'] + $item['addon_total']) * $item['qty'],
-                'addons' => json_encode($item['addons']),
-                'food_note' => $item['note'] ?? null
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')'
             ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
         }
-
-        Session::forget($cartKey);
-        DB::commit();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')'
-        ]);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
     }
-}
 
     // (getTableOrder এবং completePayment মেথড আগের মতোই থাকবে...)
     public function getTableOrder($table_id)
@@ -310,36 +324,104 @@ class PosController extends Controller
         return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
     }
 
-    public function completePayment(Request $request)
+   public function completePayment(Request $request)
     {
         DB::beginTransaction();
         try {
-            $order = Order::findOrFail($request->order_id);
-            $order->update(['status' => 'Completed', 'payment_type' => $request->payment_method, 'transaction_id' => $request->transaction_id, 'due' => 0]);
+            $taxSetting = DB::table('tax_settings')->first();
+            $vat_rate = $taxSetting->vat_rate ?? 0;
+            $service_charge_rate = $taxSetting->service_charge ?? 0;
+
+            if ($request->filled('order_id')) {
+                $order = Order::findOrFail($request->order_id);
+            } else {
+                $cartKey = 'pos_cart_takeaway';
+                $cart = Session::get($cartKey, []);
+
+                if (count($cart) == 0) {
+                    return response()->json(['status' => 'error', 'message' => 'Cart is empty!']);
+                }
+
+                $subtotal = 0;
+                foreach ($cart as $item) {
+                    $subtotal += ($item['price'] + $item['addon_total']) * $item['qty'];
+                }
+
+                $order = new Order();
+                $order->order_number = time();
+                $order->order_type = 'Takeaway';
+                $order->subtotal = $subtotal;
+                $order->user_id = auth()->id() ?? 1;
+                $order->order_time = now();
+            }
+
+            $subtotal = $order->subtotal;
+            $discount_value = $request->discount_value ?? 0;
+            $discount_type = $request->discount_type ?? 'fixed';
+
+            $discount_amount = ($discount_type == 'percentage')
+                ? ($subtotal * $discount_value) / 100
+                : $discount_value;
+
+            $tax = ($subtotal * $vat_rate) / 100;
+            $service_charge = ($subtotal * $service_charge_rate) / 100;
+            $grand_total = ($subtotal + $tax + $service_charge) - $discount_amount;
+
+            // ===============================================
+            // নতুন লজিক: পেমেন্ট স্প্লিট এবং Due ক্যালকুলেশন
+            // ===============================================
+            $paymentMethod = $request->payment_method;
+            $totalPaid = $request->total_paid_amount ?? 0;
+
+            // স্প্লিট পেমেন্ট হলে আলাদা ইনপুট থেকে ডাটা নিবে
+            $cash = ($paymentMethod == 'Split') ? ($request->paid_in_cash ?? 0) : (($paymentMethod == 'Cash') ? $totalPaid : 0);
+            $card = ($paymentMethod == 'Split') ? ($request->paid_in_card ?? 0) : (($paymentMethod == 'Card') ? $totalPaid : 0);
+            $mfc  = ($paymentMethod == 'Split') ? ($request->paid_in_mfc ?? 0)  : (($paymentMethod == 'Mobile Banking') ? $totalPaid : 0);
+
+            // Due হিসাব করা হচ্ছে
+            $due = $grand_total - $totalPaid;
+            if($due < 0) $due = 0; // যদি কাস্টমার বেশি টাকা দেয়, তবে Due 0 থাকবে।
+
+            $order->update([
+                'discount_type'     => $discount_type,
+                'discount_amount'   => $discount_amount,
+                'vat_tax'           => $tax,
+                'service_charge'    => $service_charge,
+                'grand_total'       => $grand_total,
+                'payment_type'      => $paymentMethod,
+                'transaction_id'    => $request->transaction_id,
+                'status'            => 'Completed',
+                'due'               => $due,
+                'total_paid_amount' => $totalPaid, // নতুন কলাম
+                'paid_in_cash'      => $cash,      // নতুন কলাম
+                'paid_in_card'      => $card,      // নতুন কলাম
+                'paid_in_mfc'       => $mfc        // নতুন কলাম
+            ]);
+
+            if (!$request->filled('order_id')) {
+                foreach ($cart as $item) {
+                    OrderDetail::create([
+                        'order_id'     => $order->id,
+                        'product_id'   => $item['food_id'],
+                        'product_name' => $item['name'],
+                        'quantity'     => $item['qty'],
+                        'price'        => $item['price'],
+                        'subtotal'     => ($item['price'] + $item['addon_total']) * $item['qty'],
+                    ]);
+                }
+                Session::forget('pos_cart_takeaway');
+            }
 
             if ($order->table_id) {
                 Table::where('id', $order->table_id)->update(['initial_status' => 'Available']);
             }
 
-            if ($order->customer_id) {
-                $pointSetting = DB::table('reward_point_settings')->first();
-                $earnedPoints = 0;
-                if ($pointSetting) {
-                    if ($pointSetting->reward_type == 'order_based') {
-                        $earnedPoints = $pointSetting->points_per_order;
-                    } else {
-                        $amountToSpend = $pointSetting->amount_to_spend > 0 ? $pointSetting->amount_to_spend : 1;
-                        $earnedPoints = floor($order->grand_total / $amountToSpend) * $pointSetting->points_per_amount;
-                    }
-                }
-                if ($earnedPoints > 0) {
-                    Customer::where('id', $order->customer_id)->increment('points', $earnedPoints);
-                    PointHistory::create(['customer_id' => $order->customer_id, 'point' => $earnedPoints, 'note' => 'Earned from #'.$order->order_number]);
-                }
-            }
-
             DB::commit();
-            return response()->json(['status' => 'success', 'redirect_url' => url('/pos/invoice/'.$order->id)]);
+            return response()->json([
+                'status'       => 'success',
+                'redirect_url' => url('/pos/invoice/'.$order->id)
+            ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => 'Payment failed! '.$e->getMessage()]);
@@ -347,20 +429,45 @@ class PosController extends Controller
     }
 
 
-
-// ====================================================
-    // Invoice Print Method
+    // ====================================================
+    // Invoice & Pre-Invoice Print Methods
     // ====================================================
     public function printInvoice($id)
     {
-        // ডাটাবেজ থেকে অর্ডার এবং এর সাথে সম্পর্কিত সব ডাটা নিয়ে আসা
         $order = Order::with(['orderDetails', 'customer', 'waiter', 'user'])->findOrFail($id);
-
-        // রেস্টুরেন্টের সেটিংস নিয়ে আসা (ইনভয়েসের হেডার/লোগোর জন্য)
         $restaurant = \App\Models\RestaurantSetting::first();
-
-        // invoice.blade.php ভিউ রিটার্ন করা (ফাইলটি resources/views/admin/pos/ ফোল্ডারে থাকতে হবে)
         return view('admin.pos.invoice', compact('order', 'restaurant'));
+    }
+
+    public function printPreInvoice(Request $request, $id)
+    {
+        $order = Order::with(['orderDetails', 'customer', 'waiter', 'user'])->findOrFail($id);
+        $restaurant = \App\Models\RestaurantSetting::first();
+        $taxSetting = DB::table('tax_settings')->first();
+        $invoiceSetting = \App\Models\InvoiceSetting::first();
+
+        // মোডালে দেওয়া লাইভ ডিসকাউন্টটি রিসিভ করে ক্যালকুলেশন করা হচ্ছে
+        // (যাতে সেভ না করলেও প্রি-ইনভয়েসে ডিসকাউন্ট দেখায়)
+        $subtotal = $order->subtotal;
+        $disc_type = $request->disc_type ?? 'fixed';
+        $disc_val = $request->disc_val ?? 0;
+
+        $discount_amount = ($disc_type == 'percentage') ? ($subtotal * $disc_val) / 100 : $disc_val;
+        $vat_rate = $taxSetting->vat_rate ?? 0;
+        $service_rate = $taxSetting->service_charge ?? 0;
+
+        $tax = ($subtotal * $vat_rate) / 100;
+        $service = ($subtotal * $service_rate) / 100;
+        $grand_total = ($subtotal + $tax + $service) - $discount_amount;
+
+        // শুধু ভিউয়ের জন্য সাময়িকভাবে ডাটাগুলো ওভাররাইড করা হলো (ডাটাবেজে সেভ হবে না)
+        $order->discount_type = $disc_type;
+        $order->discount_amount = $discount_amount;
+        $order->vat_tax = $tax;
+        $order->service_charge = $service;
+        $order->grand_total = $grand_total;
+
+        return view('admin.pos.pre_invoice', compact('order', 'restaurant', 'invoiceSetting'));
     }
 
 }
