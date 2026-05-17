@@ -23,9 +23,9 @@
               <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
                 <span>Subtotal</span><span id="paySubtotal">৳0.00</span>
               </div>
-              <div class="progga-pos-total-row service-charge-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
-                <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span id="payService">৳0.00</span>
-              </div>
+              <div class="progga-pos-total-row" id="payServiceRow" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
+    <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span id="payService">৳0.00</span>
+</div>
               <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
                 <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span><span id="payVat">৳0.00</span>
               </div>
@@ -51,7 +51,8 @@
           <div class="col-md-7">
             <form class="progga-pay-form" id="payForm">
               <input type="hidden" id="payOrderId" name="order_id">
-              <input type="hidden" id="payOrderType" name="order_type"> <div class="row mb-3">
+              <input type="hidden" id="payOrderType" name="order_type">
+              <div class="row mb-3">
                 <div class="col-6">
                     <label style="font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px;">Discount Type</label>
                     <select name="discount_type" id="modal_discount_type" class="form-control" style="border: 1.5px solid var(--progga-border); border-radius: 8px; font-size: 13px;" onchange="calculateModalTotal()">
@@ -60,6 +61,7 @@
                     </select>
                 </div>
                 <div class="col-6">
+
                     <label style="font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px;">Discount Amount</label>
                     <input type="number" name="discount_value" id="modal_discount_value" class="form-control" placeholder="0" min="0" style="border: 1.5px solid var(--progga-border); border-radius: 8px; font-size: 13px;" onkeyup="calculateModalTotal()">
                 </div>
@@ -146,22 +148,28 @@ input[type="radio"]:checked + .progga-pay-method-btn {
 // ===============================================
 // Open Payment Modal Override
 // ===============================================
+// ===============================================
+// Open Payment Modal with Order Type
+// ===============================================
 window.openPaymentModal = function(data) {
     let oc = document.getElementById('tableOrderOffcanvas');
     if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
 
     $('#payOrderId').val(data.order_id || '');
-    $('#payOrderType').val(data.order_type || 'takeaway');
+    $('#payOrderType').val(data.order_type || 'takeaway'); // অর্ডার টাইপ স্টোর করা হচ্ছে
 
     let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
     $('#payTableLabel').text(data.table_no || defaultLabel);
 
+    // ডাটাবেজ থেকে আসা সাবটোটাল স্টোর করা
     $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
+
     $('#paySubtotal').text('৳' + parseFloat(data.subtotal || 0).toFixed(2));
 
     $('#modal_discount_type').val('fixed');
     $('#modal_discount_value').val('');
 
+    // আইটেম লিস্ট মোডালে লোড করা
     let itemsHtml = '';
     if(data.items && data.items.length > 0) {
         data.items.forEach(item => {
@@ -245,41 +253,44 @@ $(document).on('click', '#btnPreInvoice', function() {
 });
 
 // ===============================================
-// Dynamic Modal Total with Conditional Service Charge
-// ===============================================
-window.calculateModalTotal = function() {
-    let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
-    let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
+// // Dynamic Modal Total with Conditional Service Charge
+// // ===============================================
+// window.calculateModalTotal = function() {
+//     let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
+//     let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
 
-    // শুধু Dine-In হলে সার্ভিস চার্জ কাটবে
-    let orderType = $('#payOrderType').val();
-    let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
+//     // নতুন লজিক: শুধু dine_in হলে সার্ভিস চার্জ রেট আসবে, নয়তো ০ হবে
+//     let orderType = $('#payOrderType').val();
+//     let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
 
-    let disc_type = $('#modal_discount_type').val();
-    let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
+//     let disc_type = $('#modal_discount_type').val();
+//     let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
 
-    let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
+//     let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
 
-    let vat = (subtotal * vat_rate) / 100;
-    let service = (subtotal * service_rate) / 100;
-    let grand = (subtotal + vat + service) - discount_amount;
+//     // ভ্যাট ও সার্ভিস চার্জ হিসাব
+//     let vat = (subtotal * vat_rate) / 100;
+//     let service = (subtotal * service_rate) / 100;
+//     let grand = (subtotal + vat + service) - discount_amount;
 
-    $('#payDiscount').text('−৳' + discount_amount.toFixed(2));
-    $('#payVat').text('৳' + vat.toFixed(2));
-    $('#payService').text('৳' + service.toFixed(2));
-    $('#payTotalAmount').text('৳' + grand.toFixed(2));
+//     $('#payDiscount').text('−৳' + discount_amount.toFixed(2));
+//     $('#payVat').text('৳' + vat.toFixed(2));
+//     $('#payService').text('৳' + service.toFixed(2));
+//     $('#payTotalAmount').text('৳' + grand.toFixed(2));
 
-    // Hide Service Charge row completely if it is 0
-    if(service === 0) {
-        $('.service-charge-row').hide();
-    } else {
-        $('.service-charge-row').show();
-    }
+//     // সার্ভিস চার্জ ০ হলে স্ক্রিন থেকে পুরো রো-টি হাইড করে দিবে
+//     if (service === 0) {
+//         $('#payServiceRow').hide();
+//     } else {
+//         $('#payServiceRow').show();
+//     }
 
-    if ($('input[name="payment_method"]:checked').val() !== 'Split') {
-        $('#payTotalPaidAmount').val(grand.toFixed(2));
-    }
+//     // ডিফল্ট পেইড এমাউন্ট ফিল করা (যদি স্প্লিট না হয়)
+//     if ($('input[name="payment_method"]:checked').val() !== 'Split') {
+//         $('#payTotalPaidAmount').val(grand.toFixed(2));
+//     }
 
-    window.updateDueAmount();
-};
+//     // Due আপডেট করা
+//     window.updateDueAmount();
+// };
 </script>

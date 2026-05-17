@@ -276,7 +276,7 @@ class PosController extends Controller
     }
 
 
-    public function completePayment(Request $request)
+   public function completePayment(Request $request)
     {
         DB::beginTransaction();
         try {
@@ -302,7 +302,7 @@ class PosController extends Controller
                 }
 
                 $order = new Order();
-                $order->order_number = time();
+                $order->order_number = time(); // অথবা আপনার ইনভয়েস সেটিং অনুযায়ী
                 $order->order_type = ucfirst($order_type); // Takeaway or Delivery
                 $order->subtotal = $subtotal;
                 $order->user_id = auth()->id() ?? 1;
@@ -340,7 +340,8 @@ class PosController extends Controller
             $due = $grand_total - $totalPaid;
             if($due < 0) $due = 0; // যদি কাস্টমার বেশি টাকা দেয়, তবে Due 0 থাকবে।
 
-            $order->update([
+            // update() এর পরিবর্তে fill()->save() ব্যবহার করা হলো যাতে নতুন অর্ডার ডাটাবেজে আগে Insert হয়
+            $order->fill([
                 'discount_type'     => $discount_type,
                 'discount_amount'   => $discount_amount,
                 'vat_tax'           => $tax,
@@ -354,7 +355,7 @@ class PosController extends Controller
                 'paid_in_cash'      => $cash,
                 'paid_in_card'      => $card,
                 'paid_in_mfc'       => $mfc
-            ]);
+            ])->save();
 
             if (!$request->filled('order_id')) {
                 // সরাসরি কার্ট থেকে পেমেন্ট হলে OrderDetails এ ডাটা সেভ করা
@@ -363,7 +364,7 @@ class PosController extends Controller
 
                 foreach ($cart as $item) {
                     OrderDetail::create([
-                        'order_id'     => $order->id,
+                        'order_id'     => $order->id, // এখন $order->id ঠিকমতো পাবে
                         'product_id'   => $item['food_id'],
                         'product_name' => $item['name'],
                         'quantity'     => $item['qty'],
@@ -450,7 +451,7 @@ class PosController extends Controller
         return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
     }
 
- 
+
 
 
     // ====================================================

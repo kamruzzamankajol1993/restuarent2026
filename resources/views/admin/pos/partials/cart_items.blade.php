@@ -142,6 +142,7 @@
     });
 
     // Direct Pay Button Logic (For Takeaway & Delivery)
+   // Direct Pay Button Logic (For Takeaway & Delivery)
     $('#btnDirectPay').on('click', function() {
         let itemsArr = [
             @forelse($cart as $cartId => $item)
@@ -159,12 +160,12 @@
             return;
         }
 
-        let subtotal = parseFloat("{{ $subtotal ?? 0 }}");
+       let subtotal = parseFloat("{{ $subtotal ?? 0 }}");
         let defaultLabel = currentOrder.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
 
         window.openPaymentModal({
             order_id: "",
-            order_type: currentOrder.order_type,
+            order_type: currentOrder.order_type, // এই লাইনটি যোগ করতে হবে
             table_no: defaultLabel,
             subtotal: subtotal,
             items: itemsArr

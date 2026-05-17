@@ -399,22 +399,23 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
     //     openPaymentModal(null, total);
     // });
 
-   window.openPaymentModal = function(data) {
+  window.openPaymentModal = function(data) {
     let oc = document.getElementById('tableOrderOffcanvas');
     if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
 
     $('#payOrderId').val(data.order_id || '');
-    $('#payTableLabel').text(data.table_no || 'Takeaway');
+    // অর্ডার টাইপ মোডালে সেট করা হচ্ছে
+    $('#payOrderType').val(data.order_type || 'takeaway');
 
-    // ডাটাবেজ থেকে আসা সাবটোটাল স্টোর করা
+    let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
+    $('#payTableLabel').text(data.table_no || defaultLabel);
+
     $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
-
     $('#paySubtotal').text('৳' + parseFloat(data.subtotal || 0).toFixed(2));
 
     $('#modal_discount_type').val('fixed');
     $('#modal_discount_value').val('');
 
-    // আইটেম লিস্ট মোডালে লোড করা
     let itemsHtml = '';
     if(data.items && data.items.length > 0) {
         data.items.forEach(item => {
@@ -433,28 +434,38 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
 }
 
-// master.blade.php এর ভেতরে
 window.calculateModalTotal = function() {
     let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
     let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
-    let service_rate = parseFloat("{{ $taxSettingServiceCharge ?? 0 }}");
+
+    // নতুন লজিক: শুধু dine_in হলে সার্ভিস চার্জ কাটবে, নয়তো ০ হবে
+    let orderType = $('#payOrderType').val();
+    let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
 
     let disc_type = $('#modal_discount_type').val();
     let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
 
     let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
 
-    // ভ্যাট ও সার্ভিস চার্জ সরাসরি সাবটোটালের ওপর
     let vat = (subtotal * vat_rate) / 100;
     let service = (subtotal * service_rate) / 100;
-
-    // গ্র্যান্ড টোটাল হিসাব
     let grand = (subtotal + vat + service) - discount_amount;
 
     $('#payDiscount').text('−৳' + discount_amount.toFixed(2));
     $('#payVat').text('৳' + vat.toFixed(2));
     $('#payService').text('৳' + service.toFixed(2));
     $('#payTotalAmount').text('৳' + grand.toFixed(2));
+
+    // সার্ভিস চার্জ জিরো হলে মোডাল থেকে રો হাইড করে দেওয়া
+    if(service === 0) {
+        $('#payServiceRow').hide();
+    } else {
+        $('#payServiceRow').show();
+    }
+
+    if(typeof window.updateDueAmount === 'function') {
+        window.updateDueAmount();
+    }
 }
 
    // পেমেন্ট ফর্ম সাবমিট লজিক
