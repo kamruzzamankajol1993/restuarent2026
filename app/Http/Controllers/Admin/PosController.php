@@ -70,11 +70,10 @@ class PosController extends Controller
     // ====================================================
     // টেবিল অনুযায়ী আলাদা কার্ট তৈরি করার হেল্পার মেথড
     // ====================================================
-    private function getCartKey(Request $request)
+   private function getCartKey(Request $request)
     {
-        if ($request->order_type == 'takeaway') {
-            return 'pos_cart_takeaway';
-        }
+        if ($request->order_type == 'takeaway') return 'pos_cart_takeaway';
+        if ($request->order_type == 'delivery') return 'pos_cart_delivery'; // Delivery কার্ট
         return 'pos_cart_table_' . $request->table_id;
     }
 
@@ -126,54 +125,13 @@ class PosController extends Controller
 
         $taxSetting = DB::table('tax_settings')->first();
         $vat_rate = $taxSetting ? $taxSetting->vat_rate : 0;
-        $service_charge_rate = $taxSetting ? $taxSetting->service_charge : 0;
+
+        // নতুন লজিক: শুধু Dine-In হলে সার্ভিস চার্জ পাবে, Takeaway/Delivery তে 0 হবে
+        $service_charge_rate = ($request->order_type == 'dine_in') ? ($taxSetting->service_charge ?? 0) : 0;
 
         return view('admin.pos.partials.cart_items', compact('cart', 'subtotal', 'vat_rate', 'service_charge_rate'))->render();
     }
 
-    public function updateCart(Request $request)
-    {
-        $cartKey = $this->getCartKey($request);
-        $cart = Session::get($cartKey, []);
-
-        if(isset($cart[$request->cart_id])) {
-            if($request->action == 'plus') {
-                $cart[$request->cart_id]['qty'] += 1;
-            } elseif($request->action == 'minus') {
-                if($cart[$request->cart_id]['qty'] > 1) {
-                    $cart[$request->cart_id]['qty'] -= 1;
-                } else {
-                    unset($cart[$request->cart_id]);
-                }
-            }
-            Session::put($cartKey, $cart);
-        }
-        return response()->json(['status' => 'success']);
-    }
-
-    public function updateNote(Request $request)
-    {
-        $cartKey = $this->getCartKey($request);
-        $cart = Session::get($cartKey, []);
-
-        if(isset($cart[$request->cart_id])) {
-            $cart[$request->cart_id]['note'] = $request->note;
-            Session::put($cartKey, $cart);
-        }
-        return response()->json(['status' => 'success']);
-    }
-
-    public function removeFromCart(Request $request)
-    {
-        $cartKey = $this->getCartKey($request);
-        $cart = Session::get($cartKey, []);
-
-        if(isset($cart[$request->cart_id])) {
-            unset($cart[$request->cart_id]);
-            Session::put($cartKey, $cart);
-        }
-        return response()->json(['status' => 'success']);
-    }
 
     public function placeOrder(Request $request)
     {
@@ -194,10 +152,17 @@ class PosController extends Controller
 
             $taxSetting = DB::table('tax_settings')->first();
             $vat_rate = $taxSetting->vat_rate ?? 0;
-            $service_charge_rate = $taxSetting->service_charge ?? 0;
+
+            // নতুন লজিক: শুধু Dine-In এর জন্য সার্ভিস চার্জ
+            $service_charge_rate = ($request->order_type == 'dine_in') ? ($taxSetting->service_charge ?? 0) : 0;
 
             $discount_value = $request->discount_value ?? 0;
             $discount_type = $request->discount_type ?? 'fixed';
+
+            // Order Type সেভ করার লজিক
+            $order_type_val = 'Dine-In';
+            if($request->order_type == 'takeaway') $order_type_val = 'Takeaway';
+            if($request->order_type == 'delivery') $order_type_val = 'Delivery';
 
             // ২. চেক করা: এটি কি পুরনো অর্ডার? (Add More Food)
             if ($request->filled('order_id')) {
@@ -251,10 +216,10 @@ class PosController extends Controller
                 // নতুন অর্ডার তৈরি
                 $order = Order::create([
                     'customer_id' => $customerId,
-                    'table_id' => $request->order_type == 'takeaway' ? null : $request->table_id,
+                    'table_id' => ($request->order_type == 'takeaway' || $request->order_type == 'delivery') ? null : $request->table_id,
                     'waiter_id' => $request->waiter_id,
                     'user_id' => auth()->id() ?? 1,
-                    'order_type' => ($request->order_type == 'dine_in') ? 'Dine-In' : 'Takeaway',
+                    'order_type' => $order_type_val,
                     'subtotal' => $current_cart_subtotal,
                     'discount_amount' => $discount_amount,
                     'discount_type' => $discount_type,
@@ -265,7 +230,7 @@ class PosController extends Controller
                     'status' => 'Pending',
                     'notes' => $request->order_notes,
                     'order_time' => now(),
-                    'preparation_time' => $request->preparation_time ?? 20 // ফিক্সড প্রিপারেশন টাইম
+                    'preparation_time' => $request->preparation_time ?? 20
                 ]);
 
                 if ($request->order_type == 'dine_in') {
@@ -284,8 +249,8 @@ class PosController extends Controller
             // ৫. নতুন আইটেমগুলো শুধুমাত্র নতুন KOT-তে সেভ করা
             foreach ($cart as $item) {
                 OrderDetail::create([
-                    'order_id' => $order->id,       // একই অর্ডার আইডি
-                    'order_kot_id' => $kot->id,     // নতুন KOT আইডি
+                    'order_id' => $order->id,
+                    'order_kot_id' => $kot->id,
                     'product_id' => $item['food_id'],
                     'product_name' => $item['name'],
                     'quantity' => $item['qty'],
@@ -310,32 +275,21 @@ class PosController extends Controller
         }
     }
 
-    // (getTableOrder এবং completePayment মেথড আগের মতোই থাকবে...)
-    public function getTableOrder($table_id)
-    {
-        $order = Order::with(['kots.orderDetails', 'waiter', 'customer', 'table'])
-                      ->where('table_id', $table_id)
-                      ->where('status', 'Pending')
-                      ->first();
 
-        if(!$order) return response()->json(['status' => 'error', 'message' => 'No active order found.']);
-
-        $kitchenBusy = $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking'])->exists();
-        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
-    }
-
-   public function completePayment(Request $request)
+    public function completePayment(Request $request)
     {
         DB::beginTransaction();
         try {
             $taxSetting = DB::table('tax_settings')->first();
             $vat_rate = $taxSetting->vat_rate ?? 0;
-            $service_charge_rate = $taxSetting->service_charge ?? 0;
 
             if ($request->filled('order_id')) {
                 $order = Order::findOrFail($request->order_id);
             } else {
-                $cartKey = 'pos_cart_takeaway';
+                // ডাইরেক্ট পেমেন্টের ক্ষেত্রে Takeaway বা Delivery যাচাই করা
+                $order_type = $request->order_type ?? 'takeaway';
+                $cartKey = ($order_type == 'delivery') ? 'pos_cart_delivery' : 'pos_cart_takeaway';
+
                 $cart = Session::get($cartKey, []);
 
                 if (count($cart) == 0) {
@@ -349,13 +303,17 @@ class PosController extends Controller
 
                 $order = new Order();
                 $order->order_number = time();
-                $order->order_type = 'Takeaway';
+                $order->order_type = ucfirst($order_type); // Takeaway or Delivery
                 $order->subtotal = $subtotal;
                 $order->user_id = auth()->id() ?? 1;
                 $order->order_time = now();
             }
 
             $subtotal = $order->subtotal;
+
+            // বিল ক্যালকুলেশনে সার্ভিস চার্জ চেক (শুধু Dine-In হলে সার্ভিস চার্জ কাটবে)
+            $service_charge_rate = (strtolower($order->order_type) == 'dine-in' || strtolower($order->order_type) == 'dine_in') ? ($taxSetting->service_charge ?? 0) : 0;
+
             $discount_value = $request->discount_value ?? 0;
             $discount_type = $request->discount_type ?? 'fixed';
 
@@ -368,7 +326,7 @@ class PosController extends Controller
             $grand_total = ($subtotal + $tax + $service_charge) - $discount_amount;
 
             // ===============================================
-            // নতুন লজিক: পেমেন্ট স্প্লিট এবং Due ক্যালকুলেশন
+            // পেমেন্ট স্প্লিট এবং Due ক্যালকুলেশন
             // ===============================================
             $paymentMethod = $request->payment_method;
             $totalPaid = $request->total_paid_amount ?? 0;
@@ -392,13 +350,17 @@ class PosController extends Controller
                 'transaction_id'    => $request->transaction_id,
                 'status'            => 'Completed',
                 'due'               => $due,
-                'total_paid_amount' => $totalPaid, // নতুন কলাম
-                'paid_in_cash'      => $cash,      // নতুন কলাম
-                'paid_in_card'      => $card,      // নতুন কলাম
-                'paid_in_mfc'       => $mfc        // নতুন কলাম
+                'total_paid_amount' => $totalPaid,
+                'paid_in_cash'      => $cash,
+                'paid_in_card'      => $card,
+                'paid_in_mfc'       => $mfc
             ]);
 
             if (!$request->filled('order_id')) {
+                // সরাসরি কার্ট থেকে পেমেন্ট হলে OrderDetails এ ডাটা সেভ করা
+                $order_type = $request->order_type ?? 'takeaway';
+                $cartKey = ($order_type == 'delivery') ? 'pos_cart_delivery' : 'pos_cart_takeaway';
+
                 foreach ($cart as $item) {
                     OrderDetail::create([
                         'order_id'     => $order->id,
@@ -409,7 +371,7 @@ class PosController extends Controller
                         'subtotal'     => ($item['price'] + $item['addon_total']) * $item['qty'],
                     ]);
                 }
-                Session::forget('pos_cart_takeaway');
+                Session::forget($cartKey); // যে কার্ট থেকে অর্ডার হয়েছে শুধু সেটি ক্লিয়ার হবে
             }
 
             if ($order->table_id) {
@@ -427,6 +389,68 @@ class PosController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Payment failed! '.$e->getMessage()]);
         }
     }
+
+    public function updateCart(Request $request)
+    {
+        $cartKey = $this->getCartKey($request);
+        $cart = Session::get($cartKey, []);
+
+        if(isset($cart[$request->cart_id])) {
+            if($request->action == 'plus') {
+                $cart[$request->cart_id]['qty'] += 1;
+            } elseif($request->action == 'minus') {
+                if($cart[$request->cart_id]['qty'] > 1) {
+                    $cart[$request->cart_id]['qty'] -= 1;
+                } else {
+                    unset($cart[$request->cart_id]);
+                }
+            }
+            Session::put($cartKey, $cart);
+        }
+        return response()->json(['status' => 'success']);
+    }
+
+    public function updateNote(Request $request)
+    {
+        $cartKey = $this->getCartKey($request);
+        $cart = Session::get($cartKey, []);
+
+        if(isset($cart[$request->cart_id])) {
+            $cart[$request->cart_id]['note'] = $request->note;
+            Session::put($cartKey, $cart);
+        }
+        return response()->json(['status' => 'success']);
+    }
+
+    public function removeFromCart(Request $request)
+    {
+        $cartKey = $this->getCartKey($request);
+        $cart = Session::get($cartKey, []);
+
+        if(isset($cart[$request->cart_id])) {
+            unset($cart[$request->cart_id]);
+            Session::put($cartKey, $cart);
+        }
+        return response()->json(['status' => 'success']);
+    }
+
+
+
+    // (getTableOrder এবং completePayment মেথড আগের মতোই থাকবে...)
+    public function getTableOrder($table_id)
+    {
+        $order = Order::with(['kots.orderDetails', 'waiter', 'customer', 'table'])
+                      ->where('table_id', $table_id)
+                      ->where('status', 'Pending')
+                      ->first();
+
+        if(!$order) return response()->json(['status' => 'error', 'message' => 'No active order found.']);
+
+        $kitchenBusy = $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking'])->exists();
+        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
+    }
+
+ 
 
 
     // ====================================================

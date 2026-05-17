@@ -23,14 +23,15 @@
               <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
                 <span>Subtotal</span><span id="paySubtotal">৳0.00</span>
               </div>
-              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #d33; margin-bottom: 4px;">
+              <div class="progga-pos-total-row service-charge-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
+                <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span id="payService">৳0.00</span>
+              </div>
+              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
+                <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span><span id="payVat">৳0.00</span>
+              </div>
+
+               <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #d33; margin-bottom: 4px;">
                 <span>Discount</span><span id="payDiscount">−৳0.00</span>
-              </div>
-              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
-                <span>VAT</span><span id="payVat">৳0.00</span>
-              </div>
-              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px;">
-                <span>Service Charge</span><span id="payService">৳0.00</span>
               </div>
               <div class="progga-pos-total-row grand" style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: var(--progga-primary); margin-top: 8px; border-top: 2px solid #f1f1f1; padding-top: 8px;">
                 <span>GRAND TOTAL</span><span id="payTotalAmount">৳0.00</span>
@@ -50,8 +51,7 @@
           <div class="col-md-7">
             <form class="progga-pay-form" id="payForm">
               <input type="hidden" id="payOrderId" name="order_id">
-
-              <div class="row mb-3">
+              <input type="hidden" id="payOrderType" name="order_type"> <div class="row mb-3">
                 <div class="col-6">
                     <label style="font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px;">Discount Type</label>
                     <select name="discount_type" id="modal_discount_type" class="form-control" style="border: 1.5px solid var(--progga-border); border-radius: 8px; font-size: 13px;" onchange="calculateModalTotal()">
@@ -144,6 +144,44 @@ input[type="radio"]:checked + .progga-pay-method-btn {
 
 <script>
 // ===============================================
+// Open Payment Modal Override
+// ===============================================
+window.openPaymentModal = function(data) {
+    let oc = document.getElementById('tableOrderOffcanvas');
+    if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
+
+    $('#payOrderId').val(data.order_id || '');
+    $('#payOrderType').val(data.order_type || 'takeaway');
+
+    let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
+    $('#payTableLabel').text(data.table_no || defaultLabel);
+
+    $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
+    $('#paySubtotal').text('৳' + parseFloat(data.subtotal || 0).toFixed(2));
+
+    $('#modal_discount_type').val('fixed');
+    $('#modal_discount_value').val('');
+
+    let itemsHtml = '';
+    if(data.items && data.items.length > 0) {
+        data.items.forEach(item => {
+            itemsHtml += `
+            <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+                <span class="text-muted">${item.name} ×${item.qty}</span>
+                <span style="font-weight: 600;">৳${parseFloat(item.total).toFixed(2)}</span>
+            </div>`;
+        });
+    } else {
+        itemsHtml = '<div class="text-muted text-center" style="font-size:12px;">No items</div>';
+    }
+    $('#payModalItemsArea').html(itemsHtml);
+
+    calculateModalTotal();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
+}
+
+
+// ===============================================
 // Due and Total Paid Calculation Logic
 // ===============================================
 window.updateDueAmount = function() {
@@ -157,7 +195,6 @@ window.updateDueAmount = function() {
         let mfc = parseFloat($('#splitMfc').val()) || 0;
         totalPaid = cash + card + mfc;
 
-        // Auto-fill Total Paid input and make it readonly
         $('#payTotalPaidAmount').val(totalPaid.toFixed(2)).prop('readonly', true);
     } else {
         $('#payTotalPaidAmount').prop('readonly', false);
@@ -165,12 +202,11 @@ window.updateDueAmount = function() {
     }
 
     let due = grand - totalPaid;
-    if(due < 0) due = 0; // ওভারপেমেন্ট হলে Due 0 দেখাবে
+    if(due < 0) due = 0;
 
     $('#payDueAmount').text('৳' + due.toFixed(2));
 };
 
-// যখন ম্যানুয়াল টোটাল পেইড বা স্প্লিট ইনপুটে টাইপ করবে তখন ডাইনামিক চেঞ্জ হবে
 $(document).on('keyup change', '#payTotalPaidAmount, .split-input', window.updateDueAmount);
 
 $(document).on('change', 'input[name="payment_method"]', function() {
@@ -182,7 +218,6 @@ $(document).on('change', 'input[name="payment_method"]', function() {
     } else if(method === 'Card' || method === 'Mobile Banking') {
         $('#splitPaymentDiv').slideUp('fast');
         $('#transactionDiv').slideDown('fast');
-        // অন্য পেমেন্ট মেথড হলে Grand Total টাই ডিফল্ট Paid Amount হিসেবে বসবে
         $('#payTotalPaidAmount').val(parseFloat($('#payTotalAmount').text().replace('৳', '')).toFixed(2));
     } else {
         $('#splitPaymentDiv').slideUp('fast');
@@ -198,25 +233,27 @@ $(document).on('change', 'input[name="payment_method"]', function() {
 $(document).on('click', '#btnPreInvoice', function() {
     let orderId = $('#payOrderId').val();
     if(!orderId) {
-        Swal.fire('Info', 'For Takeaway without table, please place the order first to generate a pre-invoice.', 'info');
+        Swal.fire('Info', 'For Takeaway or Delivery without table, please place the order first to generate a pre-invoice.', 'info');
         return;
     }
 
     let discType = $('#modal_discount_type').val();
     let discVal = $('#modal_discount_value').val() || 0;
 
-    // নতুন ট্যাবে প্রি-ইনভয়েস ওপেন করা (লাইভ ডিসকাউন্ট ভ্যালু সহ)
     let url = "{{ url('/pos/pre-invoice') }}/" + orderId + "?disc_type=" + discType + "&disc_val=" + discVal;
     window.open(url, '_blank');
 });
 
-// Update calculateModalTotal to run Due calculation at the end
-let oldCalculateModalTotal = window.calculateModalTotal;
+// ===============================================
+// Dynamic Modal Total with Conditional Service Charge
+// ===============================================
 window.calculateModalTotal = function() {
-    // আগের বেসিক হিসাব
     let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
     let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
-    let service_rate = parseFloat("{{ $taxSettingServiceCharge ?? 0 }}");
+
+    // শুধু Dine-In হলে সার্ভিস চার্জ কাটবে
+    let orderType = $('#payOrderType').val();
+    let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
 
     let disc_type = $('#modal_discount_type').val();
     let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
@@ -232,12 +269,17 @@ window.calculateModalTotal = function() {
     $('#payService').text('৳' + service.toFixed(2));
     $('#payTotalAmount').text('৳' + grand.toFixed(2));
 
-    // ডিফল্ট পেইড এমাউন্ট ফিল করা (যদি স্প্লিট না হয়)
+    // Hide Service Charge row completely if it is 0
+    if(service === 0) {
+        $('.service-charge-row').hide();
+    } else {
+        $('.service-charge-row').show();
+    }
+
     if ($('input[name="payment_method"]:checked').val() !== 'Split') {
         $('#payTotalPaidAmount').val(grand.toFixed(2));
     }
 
-    // Due আপডেট করা
     window.updateDueAmount();
 };
 </script>

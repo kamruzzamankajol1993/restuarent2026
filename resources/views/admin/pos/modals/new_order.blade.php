@@ -14,14 +14,17 @@
             </div>
 
             <div class="pos-modal-section">
-              <div class="pos-modal-label">Order Type</div>
-              <div class="pos-type-wrap d-flex">
-                <input type="radio" id="posTypeDineIn" name="orderType" value="dine_in" checked>
-                <input type="radio" id="posTypeTakeaway" name="orderType" value="takeaway">
-                <label for="posTypeDineIn"><i class="bi bi-layout-wtf"></i> Dine-In</label>
-                <label for="posTypeTakeaway"><i class="bi bi-bag-fill"></i> Takeaway</label>
-              </div>
-            </div>
+  <div class="pos-modal-label">Order Type</div>
+  <div class="pos-type-wrap d-flex" style="gap: 5px;">
+    <input type="radio" id="posTypeDineIn" name="orderType" value="dine_in" checked>
+    <input type="radio" id="posTypeTakeaway" name="orderType" value="takeaway">
+    <input type="radio" id="posTypeDelivery" name="orderType" value="delivery">
+
+    <label for="posTypeDineIn" id="labelDineIn" style="flex: 1; text-align: center;"><i class="bi bi-layout-wtf"></i> Dine-In</label>
+    <label for="posTypeTakeaway" style="flex: 1; text-align: center;"><i class="bi bi-bag-fill"></i> Takeaway</label>
+    <label for="posTypeDelivery" style="flex: 1; text-align: center;"><i class="bi bi-truck"></i> Delivery</label>
+  </div>
+</div>
 
             <div class="row g-3">
               <div class="col-5">

@@ -41,18 +41,16 @@
         <span>Subtotal</span>
         <span>৳{{ number_format($subtotal, 2) }}</span>
     </div>
-
+ @if($service_charge_rate > 0)
     <div class="progga-pos-total-row">
-        <span>Tax ({{ $vat_rate }}%)</span>
-        <span id="display_vat">৳{{ number_format($vat_amount, 2) }}</span>
-    </div>
-
-    @if($service_charge_rate > 0)
-    <div class="progga-pos-total-row">
-        <span>Service Charge ({{ $service_charge_rate }}%)</span>
+        <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span>
         <span id="display_service">৳{{ number_format($service_amount, 2) }}</span>
     </div>
     @endif
+    <div class="progga-pos-total-row">
+        <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span>
+        <span id="display_vat">৳{{ number_format($vat_amount, 2) }}</span>
+    </div>
 
     <div class="progga-pos-total-row grand">
         <span>TOTAL</span>
@@ -79,8 +77,8 @@
 </div>
 
 <script>
-    // Toggle Takeaway Buttons
-    if(currentOrder.order_type === 'takeaway') {
+    // Toggle Takeaway/Delivery Buttons
+    if(currentOrder.order_type === 'takeaway' || currentOrder.order_type === 'delivery') {
         $('#takeawayActions').css('display', 'grid');
         $('#btnSendToKitchen').hide();
     } else {
@@ -116,7 +114,6 @@
         }
 
         // ৬. গ্লোবাল currentOrder ভেরিয়েবল আপডেট করা
-        // (যেহেতু আপনি বলেছেন ডিসকাউন্ট শুধু মোডালে হবে, তাই এখানে ডিসকাউন্ট ০ রাখা হয়েছে)
         if (typeof currentOrder !== 'undefined') {
             currentOrder.discount_type = 'fixed';
             currentOrder.discount_value = 0;
@@ -144,7 +141,7 @@
         calculateGrandTotal();
     });
 
-    // Direct Pay Button Logic (For Takeaway)
+    // Direct Pay Button Logic (For Takeaway & Delivery)
     $('#btnDirectPay').on('click', function() {
         let itemsArr = [
             @forelse($cart as $cartId => $item)
@@ -163,15 +160,14 @@
         }
 
         let subtotal = parseFloat("{{ $subtotal ?? 0 }}");
-        let vatAmount = parseFloat("{{ $vat_amount ?? 0 }}");
-        let serviceAmount = parseFloat("{{ $service_amount ?? 0 }}");
-        let initialGrandTotal = parseFloat("{{ $grand_total ?? 0 }}");
+        let defaultLabel = currentOrder.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
 
         window.openPaymentModal({
-    order_id: "",
-    table_no: "Takeaway",
-    subtotal: subtotal,
-    items: itemsArr
-});
+            order_id: "",
+            order_type: currentOrder.order_type,
+            table_no: defaultLabel,
+            subtotal: subtotal,
+            items: itemsArr
+        });
     });
 </script>

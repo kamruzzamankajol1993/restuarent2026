@@ -123,31 +123,31 @@
 
       <div class="bill-totals">
         <div class="bill-total-row">
-          <span>Order Total</span>
+          <span>Sub Total</span>
           <span>{{ number_format($order->subtotal, 2) }}</span>
         </div>
 
-        @if($order->discount_amount > 0)
-        <div class="bill-total-row discount">
-          <span>Discount ({{ ucfirst($order->discount_type) }})</span>
-          <span>− {{ number_format($order->discount_amount, 2) }}</span>
-        </div>
-        @endif
+
 
         @if($order->service_charge > 0)
         <div class="bill-total-row">
-          <span>Service Charge</span>
+          <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span>
           <span>+ {{ number_format($order->service_charge, 2) }}</span>
         </div>
         @endif
 
         @if($order->vat_tax > 0)
         <div class="bill-total-row">
-          <span>VAT/Tax</span>
+          <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span>
           <span>+ {{ number_format($order->vat_tax, 2) }}</span>
         </div>
         @endif
-
+@if($order->discount_amount > 0)
+        <div class="bill-total-row discount">
+          <span>Discount ({{ ucfirst($order->discount_type) }})</span>
+          <span>− {{ number_format($order->discount_amount, 2) }}</span>
+        </div>
+        @endif
         <div class="bill-total-row grand">
           <span>Total Payable</span>
           <span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->grand_total, 2) }}</span>

@@ -248,7 +248,7 @@
       <span class="bill-musak">MUSAK – 6.3</span>
     </div>
 
-    <div class="bill-vat-line">VAT Reg. No – {{ $taxSettingTaxRegistrationNo ?? '006334813-0101' }}</div>
+    <div class="bill-vat-line">Bin No – {{ $taxSettingTaxRegistrationNo ?? '006334813-0101' }}</div>
 
     <div class="bill-body">
 
@@ -311,31 +311,31 @@
 
       <div class="bill-totals">
         <div class="bill-total-row">
-          <span>Order Total</span>
+          <span>Sub Total</span>
           <span>{{ number_format($order->subtotal, 2) }}</span>
         </div>
 
-        @if($order->discount_amount > 0)
-        <div class="bill-total-row discount">
-          <span>Discount ({{ ucfirst($order->discount_type) }})</span>
-          <span>− {{ number_format($order->discount_amount, 2) }}</span>
-        </div>
-        @endif
+
 
         @if($order->service_charge > 0)
         <div class="bill-total-row">
-          <span>Service Charge</span>
+          <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span>
           <span>+ {{ number_format($order->service_charge, 2) }}</span>
         </div>
         @endif
 
         @if($order->vat_tax > 0)
         <div class="bill-total-row">
-          <span>VAT/Tax</span>
+          <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span>
           <span>+ {{ number_format($order->vat_tax, 2) }}</span>
         </div>
         @endif
-
+ @if($order->discount_amount > 0)
+        <div class="bill-total-row discount">
+          <span>Discount ({{ ucfirst($order->discount_type) }})</span>
+          <span>− {{ number_format($order->discount_amount, 2) }}</span>
+        </div>
+        @endif
         <div class="bill-total-row grand">
           <span>Total Payable</span>
           <span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->grand_total, 2) }}</span>
@@ -358,7 +358,7 @@
       </div>
 
     </div><div class="bill-footer">
-      <div class="bill-thankyou">✦ Thank You ✦</div>
+      {{-- <div class="bill-thankyou">✦ Thank You ✦</div> --}}
       <div class="bill-footer-links">
         {!! nl2br(e($invoiceSettingFooterNote ?? "Tech Partner — Progga RMS\nVisit our website to know more!")) !!}
       </div>

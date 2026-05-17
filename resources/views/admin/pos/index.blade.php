@@ -8,8 +8,17 @@
     body.modal-open { overflow: auto !important; padding-right: 0 !important; }
 
     /* SweetAlert বাটন যেন উপরে থাকে তা নিশ্চিত করুন */
+   /* SweetAlert বাটন যেন উপরে থাকে তা নিশ্চিত করুন */
     .swal2-container {
         z-index: 99999 !important;
+    }
+
+    /* Order Type Active Background Color Fix */
+    .pos-type-wrap:has(#posTypeDineIn:checked) label[for="posTypeDineIn"],
+    .pos-type-wrap:has(#posTypeTakeaway:checked) label[for="posTypeTakeaway"],
+    .pos-type-wrap:has(#posTypeDelivery:checked) label[for="posTypeDelivery"] {
+      background: var(--progga-primary) !important;
+      color: var(--progga-secondary) !important;
     }
 </style>
 @endsection
@@ -73,8 +82,16 @@
         $('#indStep' + step).addClass('active');
 
         if(step === 2) {
-            $('#posSelectedTableMeta').html(currentOrder.order_type === 'takeaway' ? '<span class="text-danger">Takeaway</span>' : currentOrder.table_name);
-            $('#metaType').text(currentOrder.order_type === 'dine_in' ? 'Dine-In' : 'Takeaway');
+            // Header-এ Delivery বা Takeaway দেখানোর লজিক
+            let tableMetaHtml = currentOrder.table_name;
+            if(currentOrder.order_type === 'takeaway') tableMetaHtml = '<span class="text-danger">Takeaway</span>';
+            if(currentOrder.order_type === 'delivery') tableMetaHtml = '<span class="text-warning">Delivery</span>';
+            $('#posSelectedTableMeta').html(tableMetaHtml);
+
+            let typeText = 'Dine-In';
+            if(currentOrder.order_type === 'takeaway') typeText = 'Takeaway';
+            if(currentOrder.order_type === 'delivery') typeText = 'Delivery';
+            $('#metaType').text(typeText);
 
             let customerText = currentOrder.is_walk_in === 1 ? 'Walk-in Customer' : (currentOrder.customer_name ? currentOrder.customer_name : 'Registered Customer');
             $('#metaCustomer').text(customerText);
@@ -83,7 +100,7 @@
             $('#metaWaiter').html('<i class="bi bi-person-badge"></i> ' + waiterText);
 
             loadFoods('');
-            loadCart(); // এটি এখন সেশন থেকে এই নির্দিষ্ট টেবিলের কার্ট লোড করবে
+            loadCart();
         }
     }
 
@@ -92,7 +109,7 @@
     // ==========================================
     // TABLE SELECTION
     // ==========================================
-    $(document).on('click', '.progga-pos-table-card', function() {
+  $(document).on('click', '.progga-pos-table-card', function() {
         const tId = $(this).data('table-id');
         const tNum = $(this).data('table-num');
 
@@ -105,6 +122,10 @@
             currentOrder.table_id = tId;
             currentOrder.table_name = tNum;
             currentOrder.order_type = 'dine_in';
+
+            // Dine-In ইনপুট এবং লেবেল দুটোই আবার শো করানো হলো
+            $('#posTypeDineIn, #labelDineIn').show();
+
             $('#posTypeDineIn').prop('checked', true);
             $('#modalTableDisplaySection').slideDown();
             $('#modalSelectedTableNum').text(tNum);
@@ -112,22 +133,30 @@
         }
     });
 
-    $('#modeTakeaway').click(function() {
+   $('#modeTakeaway').click(function() {
         currentOrder.table_id = null;
         currentOrder.table_name = 'Takeaway';
         currentOrder.order_type = 'takeaway';
+
+        // Dine-In ইনপুট এবং লেবেল দুটোই হাইড করা হলো
+        $('#posTypeDineIn, #labelDineIn').hide();
+
         $('#posTypeTakeaway').prop('checked', true);
         $('#modalTableDisplaySection').slideUp();
         bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
     });
 
-    $('input[name="orderType"]').on('change', function() {
-        if($(this).val() === 'takeaway') {
+   $('input[name="orderType"]').on('change', function() {
+        let type = $(this).val();
+
+        // এখানে takeaway এর সাথে delivery ও যোগ করা হয়েছে
+        if(type === 'takeaway' || type === 'delivery') {
             $('#modalTableDisplaySection').slideUp();
-            currentOrder.order_type = 'takeaway';
+            currentOrder.order_type = type;
             currentOrder.table_id = null;
-            currentOrder.table_name = 'Takeaway';
+            currentOrder.table_name = type === 'takeaway' ? 'Takeaway' : 'Delivery';
         } else {
+            // Dine-in এর লজিক
             if(currentOrder.table_id != null) {
                 $('#modalSelectedTableNum').text(currentOrder.table_name);
                 $('#modalTableDisplaySection').slideDown();
@@ -135,7 +164,9 @@
             } else {
                 Swal.fire('Notice', 'Please go back and select a table first.', 'info');
                 $(this).prop('checked', false);
+                // যদি টেবিল না থাকে, তবে জোর করে Takeaway সিলেক্ট করে দিবে
                 $('#posTypeTakeaway').prop('checked', true);
+                currentOrder.order_type = 'takeaway';
             }
         }
     });

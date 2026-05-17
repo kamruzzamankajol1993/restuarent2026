@@ -59,23 +59,23 @@
             <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 2) }}</span>
         </div>
 
-        @if($order->discount_amount > 0)
+ @if($order->service_charge > 0)
+        <div class="progga-oc-total-row">
+            <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span>৳{{ number_format($order->service_charge, 2) }}</span>
+        </div>
+        @endif
+
+        <div class="progga-oc-total-row">
+            <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span><span>৳{{ number_format($order->vat_tax, 2) }}</span>
+        </div>
+
+
+@if($order->discount_amount > 0)
         <div class="progga-oc-total-row" style="color: #d33;">
             <span>Discount ({{ ucfirst($order->discount_type) }})</span>
             <span>−৳{{ number_format($order->discount_amount, 2) }}</span>
         </div>
         @endif
-
-        <div class="progga-oc-total-row">
-            <span>Tax/VAT</span><span>৳{{ number_format($order->vat_tax, 2) }}</span>
-        </div>
-
-        @if($order->service_charge > 0)
-        <div class="progga-oc-total-row">
-            <span>Service Charge</span><span>৳{{ number_format($order->service_charge, 2) }}</span>
-        </div>
-        @endif
-
         <div class="progga-oc-total-row grand">
             <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 2) }}</span>
         </div>

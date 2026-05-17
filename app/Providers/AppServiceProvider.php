@@ -53,13 +53,13 @@ class AppServiceProvider extends ServiceProvider
             $restaurantSettingLogo        = $restaurantSetting ? $restaurantSetting->logo : null;
 
             // ==========================================
-            // ৩. Tax Settings এর ভ্যারিয়েবলগুলো
-            // ==========================================
-            $taxSettingVatRate            = $taxSetting ? $taxSetting->vat_rate : 0;
-            $taxSettingTaxLabel           = $taxSetting ? $taxSetting->tax_label : 'VAT';
-            $taxSettingTaxRegistrationNo  = $taxSetting ? $taxSetting->tax_registration_no : null;
-            $taxSettingIsTaxIncluded      = $taxSetting ? $taxSetting->is_tax_included : false;
-            $taxSettingServiceCharge      = $taxSetting ? $taxSetting->service_charge : 0;
+// ৩. Tax Settings এর ভ্যারিয়েবলগুলো
+// ==========================================
+$taxSettingVatRate            = $taxSetting ? (float) $taxSetting->vat_rate : 0;
+$taxSettingTaxLabel           = $taxSetting ? $taxSetting->tax_label : 'VAT';
+$taxSettingTaxRegistrationNo  = $taxSetting ? $taxSetting->tax_registration_no : null;
+$taxSettingIsTaxIncluded      = $taxSetting ? $taxSetting->is_tax_included : false;
+$taxSettingServiceCharge      = $taxSetting ? (float) $taxSetting->service_charge : 0;
 
             // ==========================================
             // ৪. Invoice Settings এর ভ্যারিয়েবলগুলো
