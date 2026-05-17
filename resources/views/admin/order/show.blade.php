@@ -62,7 +62,24 @@
             </div>
         </div>
     </div>
-
+@if($order->review)
+    <div class="progga-card p-4 mb-4" style="border-left: 5px solid #ffc107; background: #fffdf5;">
+        <h5 class="mb-2" style="font-weight: 800; color: #b28900;">
+            <i class="bi bi-chat-quote-fill me-2"></i> Customer Feedback
+        </h5>
+        <div class="mb-2">
+            @for($i=1; $i<=5; $i++)
+                <i class="bi {{ $i <= $order->review->rating ? 'bi-star-fill text-warning' : 'bi-star text-muted' }}"></i>
+            @endfor
+        </div>
+        <p class="mb-1" style="font-size: 16px; color: #333; font-style: italic;">
+            "{{ $order->review->review }}"
+        </p>
+        <span style="font-size: 12px; color: #888;">
+            <i class="bi bi-clock me-1"></i> Submitted on: {{ $order->review->created_at->format('d M, Y h:i A') }}
+        </span>
+    </div>
+    @endif
     <div class="progga-card p-4">
         <h5 class="mb-3" style="font-weight: 800; color: var(--progga-primary);"><i class="bi bi-cart-check me-2"></i> Ordered Items</h5>
         <div class="table-responsive mb-4" style="border-radius: 8px; overflow: hidden; border: 1px solid var(--progga-border-light);">

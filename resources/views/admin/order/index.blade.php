@@ -49,6 +49,9 @@
       </div>
     </div>
     <div style="display:flex; gap:8px;">
+        <a href="{{ route('reviews.index') }}" class="progga-btn progga-btn-outline progga-btn-sm" style="border-color: #ffc107; color: #997300; font-weight: 700; background: #fffdf5;">
+            <i class="bi bi-star-fill text-warning"></i> View Reviews
+        </a>
     <button type="button" onclick="exportOrderPDF()" class="progga-btn progga-btn-outline progga-btn-sm">
         <i class="bi bi-file-earmark-pdf"></i> Export PDF
     </button>

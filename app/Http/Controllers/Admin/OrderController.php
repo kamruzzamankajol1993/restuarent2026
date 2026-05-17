@@ -211,10 +211,10 @@ class OrderController extends Controller
 
     public function details($id)
     {
-        // অর্ডারের সাথে জড়িত সমস্ত রিলেশনাল ডাটা ফেচ করা হচ্ছে
-        $order = Order::with(['customer', 'table', 'waiter', 'orderDetails', 'user'])->findOrFail($id);
+        // 'review' রিলেশনটি যুক্ত করা হয়েছে
+        $order = Order::with(['customer', 'table', 'waiter', 'orderDetails', 'user', 'review'])->findOrFail($id);
 
-        // নতুন ফুল-পেজ ব্লেড ফাইল রিটার্ন করা হচ্ছে
+        // ফুল-পেজ ব্লেড ফাইল রিটার্ন করা হচ্ছে
         return view('admin.order.show', compact('order'));
     }
 }

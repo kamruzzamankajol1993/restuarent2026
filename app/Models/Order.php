@@ -73,4 +73,9 @@ class Order extends Model
         // এটি Waiter মডেলের সাথে কানেক্ট করবে
         return $this->belongsTo(Waiter::class, 'waiter_id');
     }
+
+    public function review()
+    {
+        return $this->hasOne(Review::class);
+    }
 }
