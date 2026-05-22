@@ -84,7 +84,15 @@ Route::middleware(['auth'])->group(function () {
     // Food Category AJAX
     // ==========================================
     Route::get('get-subcategories/{id}', [App\Http\Controllers\Admin\FoodCategoryController::class, 'getSubcategories']);
+// POS Session Routes
+Route::post('pos-session-start', [App\Http\Controllers\Admin\PosController::class, 'startSession'])->name('pos.session.start');
+Route::post('pos-session-end', [App\Http\Controllers\Admin\PosController::class, 'endSession'])->name('pos.session.end');
 
+// POS Session History & Report Routes
+Route::get('/pos/session/report/{id}', [App\Http\Controllers\Admin\PosController::class, 'printSessionReport'])->name('pos.session.report');
+Route::post('/pos/session/update', [App\Http\Controllers\Admin\PosController::class, 'updateSession'])->name('pos.session.update');
+
+Route::post('/kitchen/mark-unavailable', [App\Http\Controllers\Admin\KitchenController::class, 'markItemUnavailable'])->name('kitchen.mark_unavailable');
     // ==========================================
     // POS (Point of Sale) Routes
     // ==========================================

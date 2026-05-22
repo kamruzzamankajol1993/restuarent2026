@@ -335,10 +335,10 @@ $(document).ready(function() {
                         $('#notifyOrderNumber').text(res.order.order_number);
 
                         // ২. ভ্যাট, সার্ভিস চার্জ ও টোটাল আলাদাভাবে সেট করা
-                        $('#notifyOrderSubtotal').text('৳' + parseFloat(res.order.subtotal).toFixed(2));
-                        $('#notifyOrderVat').text('৳' + parseFloat(res.order.vat_tax).toFixed(2));
-                        $('#notifyOrderService').text('৳' + parseFloat(res.order.service_charge).toFixed(2));
-                        $('#notifyOrderAmount').text('৳' + parseFloat(res.order.grand_total).toFixed(2));
+                        $('#notifyOrderSubtotal').text('৳' + parseFloat(res.order.subtotal));
+                        $('#notifyOrderVat').text('৳' + parseFloat(res.order.vat_tax));
+                        $('#notifyOrderService').text('৳' + parseFloat(res.order.service_charge));
+                        $('#notifyOrderAmount').text('৳' + parseFloat(res.order.grand_total));
 
                         // ৩. প্রিপারেশন টাইম ডিফল্ট ২০ মিনিট সেট করা
                         $('#qrPrepTime').val(20);

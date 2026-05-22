@@ -164,7 +164,6 @@ $(document).ready(function() {
         headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
     });
 
-    // Customer Type Selection Logic
     $('#qrCustomerType').on('change', function() {
         let val = $(this).val();
         if(val === 'existing') {
@@ -181,7 +180,7 @@ $(document).ready(function() {
 
     function playSound() {
         let audio = document.getElementById('notificationSound');
-        audio.currentTime = 0; // সাউন্ড শুরু থেকে বাজবে
+        audio.currentTime = 0;
         let playPromise = audio.play();
         if (playPromise !== undefined) {
             playPromise.catch(error => { console.log("Auto-play prevented."); });
@@ -196,25 +195,21 @@ $(document).ready(function() {
             type: "GET",
             success: function(res) {
                 if (res.status === 'success') {
-                    // Priority 1: QR Order
                     if (res.order) {
                         isPolling = false;
                         playSound();
 
-                        // Set Basic Details
                         $('#notifyOrderTable').text(res.order.table ? res.order.table.table_number : 'Takeaway');
                         $('#notifyOrderNumber').text(res.order.order_number);
-                        $('#notifyOrderAmount').text('৳' + parseFloat(res.order.grand_total).toFixed(2));
+                        $('#notifyOrderAmount').text('৳' + Math.round(res.order.grand_total));
                         $('#btnAcceptQrOrder').data('id', res.order.id);
 
-                        // Set Order Notes if any
                         if(res.order.notes) {
                             $('#notifyOrderNotes').html('<i class="bi bi-info-circle-fill"></i> Note: ' + res.order.notes).show();
                         } else {
                             $('#notifyOrderNotes').hide();
                         }
 
-                        // Populate Items Table
                         let itemsHtml = '';
                         if(res.order.order_details && res.order.order_details.length > 0) {
                             res.order.order_details.forEach(item => {
@@ -222,13 +217,12 @@ $(document).ready(function() {
                                 <tr>
                                     <td class="text-wrap" style="max-width: 150px; font-weight: 600;">${item.product_name}</td>
                                     <td class="text-center">×${item.quantity}</td>
-                                    <td class="text-end text-primary" style="font-weight: 700;">৳${item.subtotal}</td>
+                                    <td class="text-end text-primary" style="font-weight: 700;">৳${Math.round(item.subtotal)}</td>
                                 </tr>`;
                             });
                         }
                         $('#qrOrderItemsBody').html(itemsHtml);
 
-                        // Reset Form Fields
                         $('#qrCustomerType').val('walk_in').trigger('change');
                         $('#qrWaiterSelect').val('');
                         $('#qrNewCustomerName').val('');
@@ -238,7 +232,6 @@ $(document).ready(function() {
                         return;
                     }
 
-                    // Priority 2: Waiter Call
                     if (res.waiter_call) {
                         isPolling = false;
                         playSound();
@@ -253,7 +246,6 @@ $(document).ready(function() {
 
     setInterval(checkLiveNotifications, 3000);
 
-    // Accept Web Order Logic
     $('#btnAcceptQrOrder').on('click', function() {
         let orderId = $(this).data('id');
         let waiterId = $('#qrWaiterSelect').val();
@@ -263,7 +255,6 @@ $(document).ready(function() {
         let customerName = $('#qrNewCustomerName').val();
         let customerPhone = $('#qrNewCustomerPhone').val();
 
-        // Validation
         if(!waiterId) {
             Swal.fire('Wait!', 'Please assign a waiter to this order.', 'warning');
             return;
@@ -282,7 +273,6 @@ $(document).ready(function() {
         let btn = $(this);
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Processing...');
 
-        // AJAX Request
         $.post("{{ route('notifications.accept_order') }}", {
             id: orderId,
             waiter_id: waiterId,
@@ -292,11 +282,10 @@ $(document).ready(function() {
             customer_phone: customerPhone
         }, function(res) {
             if(res.status === 'success') {
-                document.getElementById('notificationSound').pause(); // সাউন্ড অফ করা
+                document.getElementById('notificationSound').pause();
                 $('#newQrOrderModal').modal('hide');
                 btn.prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
 
-                // রিলোড করে টেবিলের নতুন স্ট্যাটাস লোড করা
                 Swal.fire({
                     toast: true, position: 'top-end', icon: 'success', title: 'Order Sent to Kitchen!', showConfirmButton: false, timer: 1500
                 }).then(() => {
@@ -309,7 +298,6 @@ $(document).ready(function() {
         });
     });
 
-    // Resolve Waiter Call Logic (Same as before)
     $('#btnResolveWaiter').on('click', function() {
         let callId = $(this).data('id');
         let btn = $(this);

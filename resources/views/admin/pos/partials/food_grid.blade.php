@@ -10,13 +10,9 @@
     <div class="progga-pos-food-body">
         <div class="progga-pos-food-name">{{ $food->name }}</div>
         <div class="progga-pos-food-footer">
-            <div class="progga-pos-food-price">৳{{ $food->discount_price ?? $food->base_price }}</div>
+            <div class="progga-pos-food-price">৳{{ round($food->discount_price ?? $food->base_price) }}</div>
             <div class="progga-pos-food-add"><i class="bi bi-plus-lg"></i></div>
         </div>
     </div>
 </div>
 @endforeach
-
-<div class="w-100 mt-3 px-3">
-    {{ $foods->links('pagination::bootstrap-4') }}
-</div>

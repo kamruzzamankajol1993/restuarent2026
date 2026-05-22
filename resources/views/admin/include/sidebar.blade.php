@@ -10,7 +10,6 @@
     </div>
     <div>
       <div class="progga-brand-name">{{ $restaurantSettingName ?? 'Progga RMS' }}</div>
-      <div class="progga-brand-tagline">Restaurant System</div>
     </div>
   </div>
   <nav class="progga-sidebar-nav">

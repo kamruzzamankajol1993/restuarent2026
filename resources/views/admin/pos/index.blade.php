@@ -3,17 +3,13 @@
 
 @section('css')
 <style>
-    /* অপ্রয়োজনীয় Choices.js CSS সরিয়ে ফেলুন যদি না লাগে */
     .modal-backdrop { display: none !important; }
     body.modal-open { overflow: auto !important; padding-right: 0 !important; }
 
-    /* SweetAlert বাটন যেন উপরে থাকে তা নিশ্চিত করুন */
-   /* SweetAlert বাটন যেন উপরে থাকে তা নিশ্চিত করুন */
     .swal2-container {
         z-index: 99999 !important;
     }
 
-    /* Order Type Active Background Color Fix */
     .pos-type-wrap:has(#posTypeDineIn:checked) label[for="posTypeDineIn"],
     .pos-type-wrap:has(#posTypeTakeaway:checked) label[for="posTypeTakeaway"],
     .pos-type-wrap:has(#posTypeDelivery:checked) label[for="posTypeDelivery"] {
@@ -25,15 +21,38 @@
 
 @section('body')
 <div class="progga-pos-wrapper">
-    <div class="progga-pos-header">
-      <div class="progga-pos-logo">PROGGA RMS</div>
-      <div class="progga-pos-step-indicator">
-        <div class="progga-pos-step active" id="indStep1"><span class="progga-pos-step-num">1</span> Table</div>
-        <span class="progga-pos-step-divider">›</span>
-        <div class="progga-pos-step" id="indStep2"><span class="progga-pos-step-num">2</span> Order</div>
-      </div>
-      <a href="{{ route('home') }}" class="progga-pos-close"><i class="bi bi-x-lg"></i></a>
-    </div>
+   <div class="progga-pos-header">
+  <div class="progga-pos-logo">
+    @if(!empty($restaurantSettingIconName))
+        <img src="{{ asset('public/'.$restaurantSettingIconName) }}" alt="Icon" style="width: 60px; height: 60px; object-fit: contain;">
+    @else
+        {{ strtoupper(substr($restaurantSettingName ?? 'P', 0, 1)) }}
+    @endif
+    <span>GOLPO KHANA</span>
+  </div>
+
+  <div class="progga-pos-step-indicator">
+    <div class="progga-pos-step active" id="indStep1"><span class="progga-pos-step-num">1</span> Table</div>
+    <span class="progga-pos-step-divider">›</span>
+    <div class="progga-pos-step" id="indStep2"><span class="progga-pos-step-num">2</span> Order</div>
+  </div>
+
+  <div class="d-flex align-items-center" style="gap: 15px;">
+    @if($activeSession)
+    <button type="button" class="progga-btn progga-btn-danger progga-btn-sm" onclick="confirmEndSession({{ $activeSession->id }})" title="End Shift & Print Report">
+        <i class="bi bi-stop-circle"></i> End Shift
+    </button>
+@endif
+
+    <a href="{{ url('/clear') }}" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" title="Clear System Cache">
+        <i class="bi bi-arrow-clockwise"></i> Clear Cache
+    </a>
+    <button type="button" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" data-bs-toggle="modal" data-bs-target="#sessionHistoryModal">
+    <i class="bi bi-history"></i> Session History
+</button>
+    <a href="{{ route('home') }}" class="progga-pos-close m-0"><i class="bi bi-x-lg"></i></a>
+  </div>
+</div>
 
     <div class="progga-pos-body">
         @include('admin.pos.step1_tables')
@@ -45,15 +64,147 @@
 @include('admin.pos.modals.addon')
 @include('admin.pos.modals.payment')
 @include('admin.pos.partials.offcanvas_wrapper')
+<div class="modal fade progga-modal" id="startSessionModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-play-circle-fill me-2"></i>Start Work Period</h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <p class="text-muted mb-4">You have no active session. Start a new work period to process orders.</p>
+                <button type="button" class="btn btn-success w-100 fw-bold py-2" id="btnStartSession">
+                    <i class="bi bi-check-circle"></i> Start Shift Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
+@if(isset($requirePreviousSessionClose) && $requirePreviousSessionClose)
+<div class="modal fade progga-modal" id="previousSessionModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; border: 2px solid #dc3545;">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Pending Session Alert</h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <h5 class="text-danger fw-bold">You have an unfinished session from yesterday!</h5>
+                <p class="text-muted mt-2 mb-4">Started on: <strong>{{ $activeSession->start_time->format('l, M d, Y h:i A') }}</strong><br>Please end the previous session to start working today.</p>
+                <button type="button" class="btn btn-danger w-100 fw-bold py-2" onclick="processEndSession({{ $activeSession->id }})">
+                    <i class="bi bi-stop-circle-fill"></i> End Previous Session & Print Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+<div class="modal fade progga-modal" id="sessionHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-table me-2"></i>Work Period Sessions</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3" style="max-height: 500px; overflow-y: auto;">
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered align-middle text-center" style="font-size: 13px;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Employee</th>
+                                <th>Day</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Duration</th>
+                                <th>Grand Total</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($sessions as $sess)
+                                <tr>
+                                    <td><strong>#{{ $sess->id }}</strong></td>
+                                    <td>{{ $sess->user->name ?? 'N/A' }}</td>
+                                    <td><span class="badge bg-secondary">{{ $sess->weekday }}</span></td>
+                                    <td>{{ $sess->start_time->format('d M y - h:i A') }}</td>
+                                    <td>{{ $sess->end_time ? $sess->end_time->format('d M y - h:i A') : '—' }}</td>
+                                    <td>{{ $sess->duration ?? 'Running' }}</td>
+                                    <td><strong>৳{{ round($sess->grand_total) }}</strong></td>
+                                    <td>
+                                        <span class="badge {{ $sess->status == 'Open' ? 'bg-success' : 'bg-danger' }}">
+                                            {{ $sess->status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <button type="button" class="btn btn-sm btn-primary" onclick="editSession({{ json_encode($sess) }})">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </button>
+                                            @if($sess->status == 'Closed')
+                                                <a href="{{ route('pos.session.report', $sess->id) }}" target="_blank" class="btn btn-sm btn-warning fw-bold">
+                                                    <i class="bi bi-printer"></i> Print
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="9" class="text-muted py-4">No sessions found!</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade progga-modal" id="editSessionModal" tabindex="-1" style="z-index: 1056;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Session #<span id="editSessIdLabel"></span></h5>
+                <button type="button" class="btn-close btn-close-white" onclick="$('#editSessionModal').modal('hide')"></button>
+            </div>
+            <form id="editSessionForm">
+                <div class="modal-body p-3">
+                    <input type="hidden" id="editSessionId" name="session_id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size: 12px;">Start Time</label>
+                        <input type="datetime-local" id="editStartTime" name="start_time" class="form-control" required style="font-size: 13px;">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size: 12px;">End Time</label>
+                        <input type="datetime-local" id="editEndTime" name="end_time" class="form-control" style="font-size: 13px;">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold" style="font-size: 12px;">Status</label>
+                        <select id="editStatus" name="status" class="form-control" style="font-size: 13px;">
+                            <option value="Open">Open</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer p-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('script')
 
 <script>
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
-
-
 
     let currentOrder = {
         order_type: 'dine_in', table_id: null, table_name: '',
@@ -64,7 +215,6 @@
 
     $(document).ready(function() { loadFoods(''); });
 
-    // Table অনুযায়ী কার্ট আইডেন্টিফাই করার জন্য
     function getCartParams() {
         return {
             order_type: currentOrder.order_type,
@@ -72,9 +222,6 @@
         };
     }
 
-    // ==========================================
-    // STEP NAVIGATION
-    // ==========================================
     function showStep(step) {
         $('.progga-pos-screen').removeClass('active');
         $('#posStep' + step).addClass('active');
@@ -82,7 +229,6 @@
         $('#indStep' + step).addClass('active');
 
         if(step === 2) {
-            // Header-এ Delivery বা Takeaway দেখানোর লজিক
             let tableMetaHtml = currentOrder.table_name;
             if(currentOrder.order_type === 'takeaway') tableMetaHtml = '<span class="text-danger">Takeaway</span>';
             if(currentOrder.order_type === 'delivery') tableMetaHtml = '<span class="text-warning">Delivery</span>';
@@ -106,9 +252,6 @@
 
     $('#posBackToTables').click(function() { showStep(1); });
 
-    // ==========================================
-    // TABLE SELECTION
-    // ==========================================
   $(document).on('click', '.progga-pos-table-card', function() {
         const tId = $(this).data('table-id');
         const tNum = $(this).data('table-num');
@@ -123,9 +266,7 @@
             currentOrder.table_name = tNum;
             currentOrder.order_type = 'dine_in';
 
-            // Dine-In ইনপুট এবং লেবেল দুটোই আবার শো করানো হলো
             $('#posTypeDineIn, #labelDineIn').show();
-
             $('#posTypeDineIn').prop('checked', true);
             $('#modalTableDisplaySection').slideDown();
             $('#modalSelectedTableNum').text(tNum);
@@ -138,9 +279,7 @@
         currentOrder.table_name = 'Takeaway';
         currentOrder.order_type = 'takeaway';
 
-        // Dine-In ইনপুট এবং লেবেল দুটোই হাইড করা হলো
         $('#posTypeDineIn, #labelDineIn').hide();
-
         $('#posTypeTakeaway').prop('checked', true);
         $('#modalTableDisplaySection').slideUp();
         bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
@@ -149,14 +288,12 @@
    $('input[name="orderType"]').on('change', function() {
         let type = $(this).val();
 
-        // এখানে takeaway এর সাথে delivery ও যোগ করা হয়েছে
         if(type === 'takeaway' || type === 'delivery') {
             $('#modalTableDisplaySection').slideUp();
             currentOrder.order_type = type;
             currentOrder.table_id = null;
             currentOrder.table_name = type === 'takeaway' ? 'Takeaway' : 'Delivery';
         } else {
-            // Dine-in এর লজিক
             if(currentOrder.table_id != null) {
                 $('#modalSelectedTableNum').text(currentOrder.table_name);
                 $('#modalTableDisplaySection').slideDown();
@@ -164,16 +301,12 @@
             } else {
                 Swal.fire('Notice', 'Please go back and select a table first.', 'info');
                 $(this).prop('checked', false);
-                // যদি টেবিল না থাকে, তবে জোর করে Takeaway সিলেক্ট করে দিবে
                 $('#posTypeTakeaway').prop('checked', true);
                 currentOrder.order_type = 'takeaway';
             }
         }
     });
 
-    // ==========================================
-    // START ORDER BUTTON
-    // ==========================================
     $('#posWalkIn').on('change', function() {
         if($(this).is(':checked')) { $('#posCustomerFields').slideUp(); }
         else { $('#posCustomerFields').slideDown(); }
@@ -220,12 +353,9 @@
         showStep(2);
     });
 
-    // ==========================================
-    // FOODS & CATEGORY
-    // ==========================================
-    function loadFoods(catId = '', search = '', page = 1) {
+    function loadFoods(catId = '', search = '') {
         currentCat = catId;
-        $.get("{{ route('pos.get_foods') }}?page=" + page, { category_id: catId, search: search }, function(res) {
+        $.get("{{ route('pos.get_foods') }}", { category_id: catId, search: search }, function(res) {
             $('#posFoodGrid').html(res);
         });
     }
@@ -237,15 +367,6 @@
     });
     $('#posFoodSearch').on('keyup', function() { loadFoods(currentCat, $(this).val()); });
 
-    $(document).on('click', '.pagination a', function(e) {
-        e.preventDefault();
-        let page = $(this).attr('href').split('page=')[1];
-        loadFoods(currentCat, $('#posFoodSearch').val(), page);
-    });
-
-    // ==========================================
-    // ADDONS & CART ACTIONS (Table Specific!)
-    // ==========================================
     window.checkAddonAndCart = function(foodId, hasAddon) {
         if(hasAddon == 1) {
             $.get("{{ route('pos.get_addons', ':id') }}".replace(':id', foodId), function(res) {
@@ -311,6 +432,7 @@
             showToast('Info', 'Note updated', 'info');
         });
     }
+
 $(document).on('change', 'input[name="payment_method"]', function() {
     if($(this).val() === 'Card' || $(this).val() === 'Mobile Banking') {
         $('#transactionDiv').slideDown('fast');
@@ -318,19 +440,15 @@ $(document).on('change', 'input[name="payment_method"]', function() {
         $('#transactionDiv').slideUp('fast');
     }
 });
-    // ==========================================
-    // SEND TO KITCHEN (100% Fixed)
-    // ==========================================
+
 $(document).on('click', '#btnSendToKitchen', function(e) {
     e.preventDefault();
 
-    // ভ্যালিডেশন
     if (currentOrder.order_type === 'dine_in' && !currentOrder.table_id) {
         window.proggaToast('Please select a table first!', 'danger');
         return;
     }
 
-    // সরাসরি window.Swal ব্যবহার করুন কনফ্লিক্ট এড়াতে
     window.Swal.fire({
         title: 'Send to Kitchen?',
         text: "Are you sure you want to place this order?",
@@ -339,28 +457,27 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
         confirmButtonColor: '#21352a',
         cancelButtonColor: '#d33',
         confirmButtonText: 'Yes, Send!',
-        allowOutsideClick: false // যেন ক্লিক মিস না হয়
+        allowOutsideClick: false
     }).then(function(result) {
         if (result.isConfirmed) {
-            // ডাটা কালেকশন
             var discType = $('#cart_discount_type').val() || 'fixed';
             var discVal = parseFloat($('#cart_discount_value').val()) || 0;
 
             var payload = {
-    order_id: currentOrder.order_id || null, // <--- এই লাইনটি অবশ্যই যোগ করতে হবে
-    order_type: currentOrder.order_type,
-    table_id: currentOrder.table_id,
-    waiter_id: currentOrder.waiter_id,
-    is_walk_in: currentOrder.is_walk_in,
-    customer_id: currentOrder.customer_id,
-    customer_name: currentOrder.customer_name,
-    customer_phone: currentOrder.customer_phone,
-    order_notes: currentOrder.order_notes,
-    discount_type: discType,
-    discount_value: discVal,
-    preparation_time: $('#cart_prep_time').val() || 20,
-    _token: $('meta[name="csrf-token"]').attr('content')
-};
+                order_id: currentOrder.order_id || null,
+                order_type: currentOrder.order_type,
+                table_id: currentOrder.table_id,
+                waiter_id: currentOrder.waiter_id,
+                is_walk_in: currentOrder.is_walk_in,
+                customer_id: currentOrder.customer_id,
+                customer_name: currentOrder.customer_name,
+                customer_phone: currentOrder.customer_phone,
+                order_notes: currentOrder.order_notes,
+                discount_type: discType,
+                discount_value: discVal,
+                preparation_time: $('#cart_prep_time').val() || 20,
+                _token: $('meta[name="csrf-token"]').attr('content')
+            };
 
             var btn = $('#btnSendToKitchen');
             var originalHtml = btn.html();
@@ -391,27 +508,19 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
         }
     });
 });
-    // ==========================================
-    // PAYMENT
-    // ==========================================
-    // $(document).on('click', '#btnDirectPay', function() {
-    //     let total = $('#display_grand_total').text().replace('৳ ', '');
-    //     openPaymentModal(null, total);
-    // });
 
-  window.openPaymentModal = function(data) {
+window.openPaymentModal = function(data) {
     let oc = document.getElementById('tableOrderOffcanvas');
     if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
 
     $('#payOrderId').val(data.order_id || '');
-    // অর্ডার টাইপ মোডালে সেট করা হচ্ছে
     $('#payOrderType').val(data.order_type || 'takeaway');
 
     let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
     $('#payTableLabel').text(data.table_no || defaultLabel);
 
     $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
-    $('#paySubtotal').text('৳' + parseFloat(data.subtotal || 0).toFixed(2));
+    $('#paySubtotal').text('৳' + Math.round(data.subtotal || 0));
 
     $('#modal_discount_type').val('fixed');
     $('#modal_discount_value').val('');
@@ -422,7 +531,7 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
             itemsHtml += `
             <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
                 <span class="text-muted">${item.name} ×${item.qty}</span>
-                <span style="font-weight: 600;">৳${parseFloat(item.total).toFixed(2)}</span>
+                <span style="font-weight: 600;">৳${Math.round(item.total)}</span>
             </div>`;
         });
     } else {
@@ -438,29 +547,31 @@ window.calculateModalTotal = function() {
     let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
     let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
 
-    // নতুন লজিক: শুধু dine_in হলে সার্ভিস চার্জ কাটবে, নয়তো ০ হবে
     let orderType = $('#payOrderType').val();
     let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
 
     let disc_type = $('#modal_discount_type').val();
     let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
 
-    let discount_amount = (disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val;
+    let service = Math.round((subtotal * service_rate) / 100);
+    let vat = Math.round(((subtotal + service) * vat_rate) / 100);
+    let discount_amount = Math.round((disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val);
 
-    let vat = (subtotal * vat_rate) / 100;
-    let service = (subtotal * service_rate) / 100;
-    let grand = (subtotal + vat + service) - discount_amount;
+    let grand = Math.round((subtotal + vat + service) - discount_amount);
 
-    $('#payDiscount').text('−৳' + discount_amount.toFixed(2));
-    $('#payVat').text('৳' + vat.toFixed(2));
-    $('#payService').text('৳' + service.toFixed(2));
-    $('#payTotalAmount').text('৳' + grand.toFixed(2));
+    $('#payDiscount').text('−৳' + discount_amount);
+    $('#payVat').text('৳' + vat);
+    $('#payService').text('৳' + service);
+    $('#payTotalAmount').text('৳' + grand);
 
-    // সার্ভিস চার্জ জিরো হলে মোডাল থেকে રો হাইড করে দেওয়া
     if(service === 0) {
         $('#payServiceRow').hide();
     } else {
         $('#payServiceRow').show();
+    }
+
+    if ($('input[name="payment_method"]:checked').val() !== 'Split') {
+        $('#payTotalPaidAmount').val(grand);
     }
 
     if(typeof window.updateDueAmount === 'function') {
@@ -468,7 +579,6 @@ window.calculateModalTotal = function() {
     }
 }
 
-   // পেমেন্ট ফর্ম সাবমিট লজিক
 $(document).on('submit', '#payForm', function(e) {
     e.preventDefault();
 
@@ -476,7 +586,6 @@ $(document).on('submit', '#payForm', function(e) {
     let originalHtml = btn.html();
     btn.html('<i class="spinner-border spinner-border-sm"></i> Processing...').prop('disabled', true);
 
-    // ফর্মের ডাটা (পেমেন্ট মেথড, ট্রানজেকশন আইডি এবং ডিসকাউন্ট ডাটা)
     let formData = $(this).serialize();
 
     $.ajax({
@@ -501,7 +610,6 @@ $(document).on('submit', '#payForm', function(e) {
 });
 
  $(document).on('click', '#btnContinueOrdering', function() {
-    // ১. বাটন থেকে ডাটা সংগ্রহ
     const tId = $(this).data('table-id');
     const orderId = $(this).data('order-id');
     const waiterId = $(this).data('waiter-id');
@@ -509,19 +617,16 @@ $(document).on('submit', '#payForm', function(e) {
     const customerId = $(this).data('customer-id');
     const customerName = $(this).data('customer-name');
 
-    const tNum = $('#ocTableNum').text(); // অফক্যানভাস থেকে টেবিলের নাম
+    const tNum = $('#ocTableNum').text();
 
-    // ২. বর্তমান অর্ডারের স্টেট (currentOrder) আপডেট
     currentOrder.table_id = tId;
     currentOrder.table_name = tNum;
     currentOrder.order_id = orderId;
     currentOrder.order_type = 'dine_in';
 
-    // ওয়েটার আপডেট
     currentOrder.waiter_id = waiterId ? waiterId : null;
     currentOrder.waiter_name = waiterName ? waiterName : '';
 
-    // কাস্টমার আপডেট (Walk-in চেক)
     if(customerId) {
         currentOrder.is_walk_in = 0;
         currentOrder.customer_id = customerId;
@@ -532,30 +637,22 @@ $(document).on('submit', '#payForm', function(e) {
         currentOrder.customer_name = '';
     }
 
-    // ৩. অফক্যানভাস বন্ধ করা
     var ocElement = document.getElementById('tableOrderOffcanvas');
     if (ocElement) {
         var ocInstance = bootstrap.Offcanvas.getInstance(ocElement);
         if (ocInstance) ocInstance.hide();
     }
 
-    // ৪. স্টেপ ২ তে নিয়ে যাওয়া এবং কার্ট লোড করা
     showStep(2);
     loadCart();
 });
 
-// ==========================================
-    // TABLE FILTERING TABS
-    // ==========================================
     $(document).on('click', '.progga-pos-filter-btn', function() {
-        // সব বাটন থেকে active ক্লাস সরিয়ে ক্লিক করা বাটনে অ্যাড করা
         $('.progga-pos-filter-btn').removeClass('active');
         $(this).addClass('active');
 
-        // ফিল্টারের ভ্যালু নেওয়া (all, available, occupied, reserved)
         let filterValue = $(this).data('table-filter');
 
-        // টেবিল ফিল্টার লজিক
         if(filterValue === 'all') {
             $('.progga-pos-table-card').fadeIn('fast');
         } else {
@@ -564,22 +661,134 @@ $(document).on('submit', '#payForm', function(e) {
         }
     });
 
-    // ==========================================
-    // MOBILE CART TOGGLE LOGIC
-    // ==========================================
     $(document).on('click', '#posCartFab', function() {
-        // progga-style.css এর ক্লাস অনুযায়ী কার্ট ওপেন হবে
         $('.progga-pos-cart').addClass('show');
         $('#posMobileBackdrop').fadeIn('fast');
-        $('body').addClass('progga-pos-overflow-lock'); // ব্যাকগ্রাউন্ড স্ক্রল অফ
+        $('body').addClass('progga-pos-overflow-lock');
     });
 
     $(document).on('click', '#posMobileCartClose, #posMobileBackdrop', function() {
-        // ক্লোজ বাটনে বা ব্যাকড্রপে ক্লিক করলে কার্ট হাইড হবে
         $('.progga-pos-cart').removeClass('show');
         $('#posMobileBackdrop').fadeOut('fast');
-        $('body').removeClass('progga-pos-overflow-lock'); // ব্যাকগ্রাউন্ড স্ক্রল অন
+        $('body').removeClass('progga-pos-overflow-lock');
     });
+
+    $(document).ready(function() {
+    let hasActiveSession = "{{ $activeSession ? 'yes' : 'no' }}";
+    let requiresClose = "{{ $requirePreviousSessionClose ?? false }}";
+
+    // লজিক: যদি কোনো সেশন না থাকে, তাহলে Start Session মোডাল দেখাবে
+    if (hasActiveSession === 'no') {
+        $('#startSessionModal').modal('show');
+    }
+    // লজিক: যদি আগের দিনের সেশন ওপেন থাকে, তাহলে End Session 모ডাল দেখাবে
+    else if (requiresClose === '1') {
+        $('#previousSessionModal').modal('show');
+    }
+
+    // Start Session Button Click
+    $('#btnStartSession').click(function() {
+        let btn = $(this);
+        btn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm"></i> Starting...');
+
+        $.post("{{ route('pos.session.start') }}", { _token: "{{ csrf_token() }}" }, function(res) {
+            if(res.status === 'success') {
+                Swal.fire({ icon: 'success', title: 'Shift Started!', timer: 1500, showConfirmButton: false }).then(() => {
+                    location.reload();
+                });
+            }
+        });
+    });
+});
+
+// ম্যানুয়ালি End Session বাটন ক্লিক
+window.confirmEndSession = function(sessionId) {
+    Swal.fire({
+        title: 'End Current Shift?',
+        text: "This will calculate your sales and print the closing report.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, End Shift!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            processEndSession(sessionId);
+        }
+    });
+}
+
+// End Session প্রসেসিং লজিক
+window.processEndSession = function(sessionId) {
+    Swal.fire({ title: 'Processing...', text: 'Calculating reports, please wait.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+
+    $.post("{{ route('pos.session.end') }}", {
+        _token: "{{ csrf_token() }}",
+        session_id: sessionId
+    }, function(res) {
+        if(res.status === 'success') {
+            Swal.fire({ icon: 'success', title: 'Shift Ended!', text: 'Your closing report is ready.', confirmButtonText: 'Print & Reload' }).then(() => {
+                // ইনভয়েস প্রিন্টের জন্য নতুন উইন্ডো ওপেন করবে (রাউটটা আমরা পরে বানাবো)
+                // window.open("/pos/session/report/" + res.session_id, "_blank");
+                location.reload();
+            });
+        }
+    });
+}
+
+// সেশন এডিট মোডাল ওপেন লজিক
+window.editSession = function(sessionData) {
+    $('#editSessIdLabel').text(sessionData.id);
+    $('#editSessionId').val(sessionData.id);
+
+    // ডেইট ফরম্যাট ম্যাচিং (YYYY-MM-DDTHH:MM)
+    let startStr = new Date(sessionData.start_time).toISOString().slice(0, 16);
+    $('#editStartTime').val(startStr);
+
+    if(sessionData.end_time) {
+        let endStr = new Date(sessionData.end_time).toISOString().slice(0, 16);
+        $('#editEndTime').val(endStr);
+    } else {
+        $('#editEndTime').val('');
+    }
+
+    $('#editStatus').val(sessionData.status);
+
+    $('#sessionHistoryModal').modal('hide');
+    $('#editSessionModal').modal('show');
+}
+
+// সেশন এডিট ফর্ম সাবমিট
+$('#editSessionForm').on('submit', function(e) {
+    e.preventDefault();
+    let formData = $(this).serialize();
+
+    $.post("{{ route('pos.session.update') }}", formData, function(res) {
+        if(res.status === 'success') {
+            $('#editSessionModal').modal('hide');
+            Swal.fire('Updated!', res.message, 'success').then(() => {
+                location.reload();
+            });
+        }
+    });
+});
+
+// পুরনো এন্ড সেশন মেথডে প্রিন্ট লিংক আনকমেন্ট করুন
+window.processEndSession = function(sessionId) {
+    Swal.fire({ title: 'Processing...', text: 'Calculating reports, please wait.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+
+    $.post("{{ route('pos.session.end') }}", {
+        _token: "{{ csrf_token() }}",
+        session_id: sessionId
+    }, function(res) {
+        if(res.status === 'success') {
+            Swal.fire({ icon: 'success', title: 'Shift Ended!', text: 'Your closing report is ready.', confirmButtonText: 'Print & Reload' }).then(() => {
+                window.open("{{ url('/pos/session/report') }}/" + res.session_id, "_blank");
+                location.reload();
+            });
+        }
+    });
+}
 </script>
 
 @endsection

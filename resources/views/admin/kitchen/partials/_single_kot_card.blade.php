@@ -2,8 +2,7 @@
     $minutesWaiting = \Carbon\Carbon::parse($kot->created_at)->diffInMinutes(now());
     $isUrgent = $minutesWaiting > 15 ? 'urgent' : '';
 
-    // Preparation Time & Countdown Logic (Null Safe added: ?->)
-    $prepTime = $kot->order?->preparation_time ?? 20; // Default 20 mins if order missing
+    $prepTime = $kot->order?->preparation_time ?? 20;
     $isCooking = $kot->kitchen_status === 'Cooking';
     $remainingSeconds = 0;
 
@@ -37,7 +36,14 @@
             @php $addons = json_decode($item->addons, true) ?? []; @endphp
             <div class="progga-kitchen-item">
                 <div class="progga-kitchen-item-info">
-                    <span class="progga-kitchen-item-name">{{ $item->product_name }}</span>
+                    <span class="progga-kitchen-item-name">
+                        @if($item->is_unavailable)
+                            <del class="text-muted">{{ $item->product_name }}</del>
+                            <span class="badge bg-danger" style="font-size: 8px;">N/A</span>
+                        @else
+                            {{ $item->product_name }}
+                        @endif
+                    </span>
                     @if($item->food_note)
                         <div style="font-size: 11px; color: #d33; font-style: italic;">* {{ $item->food_note }}</div>
                     @endif
@@ -47,7 +53,16 @@
                         </div>
                     @endif
                 </div>
-                <span class="progga-kitchen-item-qty">×{{ $item->quantity }}</span>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="progga-kitchen-item-qty">×{{ $item->quantity }}</span>
+                    {{-- Pending থাকা অবস্থায় Unavailable করার ক্রস বাটন --}}
+                    @if($kot->kitchen_status == 'Pending' && !$item->is_unavailable)
+                        <button class="btn btn-sm btn-danger py-0 px-1 mark-unavailable-btn" data-id="{{ $item->id }}" title="Mark Unavailable">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    @endif
+                </div>
             </div>
         @endforeach
     </div>

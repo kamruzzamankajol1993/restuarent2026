@@ -13,7 +13,7 @@
                 <button class="progga-qty-btn" type="button" onclick="updateQty('{{ $cartId }}', 'minus')">−</button>
                 <span class="progga-qty-display">{{ $item['qty'] }}</span>
                 <button class="progga-qty-btn" type="button" onclick="updateQty('{{ $cartId }}', 'plus')">+</button>
-                <span class="progga-pos-item-total">৳{{ ($item['price'] + $item['addon_total']) * $item['qty'] }}</span>
+                <span class="progga-pos-item-total">৳{{ round(($item['price'] + $item['addon_total']) * $item['qty']) }}</span>
                 <button class="progga-pos-item-remove" type="button" onclick="removeCartItem('{{ $cartId }}')">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -31,30 +31,30 @@
 </div>
 
 @php
-    $vat_amount = ($subtotal * $vat_rate) / 100;
-    $service_amount = ($subtotal * $service_charge_rate) / 100;
-    $grand_total = $subtotal + $vat_amount + $service_amount;
+    $service_amount = round(($subtotal * $service_charge_rate) / 100);
+    $vat_amount = round((($subtotal + $service_amount) * $vat_rate) / 100);
+    $grand_total = round($subtotal + $vat_amount + $service_amount);
 @endphp
 
 <div class="progga-pos-cart-totals">
     <div class="progga-pos-total-row">
         <span>Subtotal</span>
-        <span>৳{{ number_format($subtotal, 2) }}</span>
+        <span>৳{{ number_format($subtotal, 0) }}</span>
     </div>
  @if($service_charge_rate > 0)
     <div class="progga-pos-total-row">
         <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span>
-        <span id="display_service">৳{{ number_format($service_amount, 2) }}</span>
+        <span id="display_service">৳{{ number_format($service_amount, 0) }}</span>
     </div>
     @endif
     <div class="progga-pos-total-row">
         <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span>
-        <span id="display_vat">৳{{ number_format($vat_amount, 2) }}</span>
+        <span id="display_vat">৳{{ number_format($vat_amount, 0) }}</span>
     </div>
 
     <div class="progga-pos-total-row grand">
         <span>TOTAL</span>
-        <span id="display_grand_total">৳{{ number_format($grand_total, 2) }}</span>
+        <span id="display_grand_total">৳{{ number_format($grand_total, 0) }}</span>
     </div>
 </div>
 
@@ -88,32 +88,25 @@
 
     // Grand Total & Mobile FAB Logic
    function calculateGrandTotal() {
-        // ১. ব্লেড/পিএইচপি থেকে আসা বেসিক ভ্যালুগুলো নেওয়া
         let subtotal = parseFloat("{{ $subtotal ?? 0 }}") || 0;
         let vat_rate = parseFloat("{{ $vat_rate ?? 0 }}") || 0;
         let service_rate = parseFloat("{{ $service_charge_rate ?? 0 }}") || 0;
 
-        // ২. ভ্যাট ও সার্ভিস চার্জ সরাসরি সাবটোটালের ওপর হিসাব করা
-        let vat = (subtotal * vat_rate) / 100;
-        let service = (subtotal * service_rate) / 100;
+        let service = Math.round((subtotal * service_rate) / 100);
+        let vat = Math.round(((subtotal + service) * vat_rate) / 100);
+        let grand = Math.round(subtotal + vat + service);
 
-        // ৩. গ্র্যান্ড টোটাল হিসাব (কার্টে ডিসকাউন্ট নেই, তাই সরাসরি যোগ)
-        let grand = subtotal + vat + service;
-
-        // ৪. সাইডবারে UI (Text) আপডেট করা
-        $('#display_grand_total').text('৳' + grand.toFixed(2));
-        $('#display_vat').text('৳' + vat.toFixed(2));
+        $('#display_grand_total').text('৳' + grand);
+        $('#display_vat').text('৳' + vat);
 
         if(document.getElementById('display_service')) {
-            $('#display_service').text('৳' + service.toFixed(2));
+            $('#display_service').text('৳' + service);
         }
 
-        // ৫. মোবাইল ভিউয়ের Floating Cart Button (FAB) আপডেট করা
         if($('#fabCartTotal').length) {
-            $('#fabCartTotal').text('৳' + grand.toFixed(2));
+            $('#fabCartTotal').text('৳' + grand);
         }
 
-        // ৬. গ্লোবাল currentOrder ভেরিয়েবল আপডেট করা
         if (typeof currentOrder !== 'undefined') {
             currentOrder.discount_type = 'fixed';
             currentOrder.discount_value = 0;
@@ -142,7 +135,6 @@
     });
 
     // Direct Pay Button Logic (For Takeaway & Delivery)
-   // Direct Pay Button Logic (For Takeaway & Delivery)
     $('#btnDirectPay').on('click', function() {
         let itemsArr = [
             @forelse($cart as $cartId => $item)
@@ -165,7 +157,7 @@
 
         window.openPaymentModal({
             order_id: "",
-            order_type: currentOrder.order_type, // এই লাইনটি যোগ করতে হবে
+            order_type: currentOrder.order_type,
             table_no: defaultLabel,
             subtotal: subtotal,
             items: itemsArr

@@ -30,12 +30,18 @@
 
   <div class="progga-auth-card progga-animate-fadein">
 
-    <div class="progga-auth-logo">
-      <div class="progga-auth-logo-mark">P</div>
-      <div class="progga-auth-brand">Progga RMS</div>
-      <div class="progga-auth-tagline">Restaurant Management System</div>
-    </div>
+    <div class="progga-auth-logo" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin-bottom: 24px;">
+  @if(!empty($restaurantSettingIconName))
+      <img src="{{ asset('public/'.$restaurantSettingIconName) }}" alt="Icon" style="max-width: 120px; max-height: 80px; object-fit: contain; margin-bottom: 12px;">
+  @else
+      <div class="progga-auth-logo-mark" style="margin-bottom: 12px;">
+          {{ strtoupper(substr($restaurantSettingName ?? 'P', 0, 1)) }}
+      </div>
+  @endif
 
+  <div class="progga-auth-brand" style="margin-bottom: 4px;">{{ $restaurantSettingName ?? 'Progga RMS' }}</div>
+  <div class="progga-auth-tagline">Restaurant Management System</div>
+</div>
     <div class="progga-auth-title">Welcome back</div>
     <div class="progga-auth-subtitle">Sign in to your account to continue</div>
 

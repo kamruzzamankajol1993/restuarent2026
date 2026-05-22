@@ -13,7 +13,7 @@
 
   <header class="progga-kitchen-header">
     <div class="progga-kitchen-brand">
-      <div class="progga-kitchen-logo">P</div>
+      <div class="progga-kitchen-logo">T</div>
       <div>
         <div class="progga-kitchen-title">Kitchen Board</div>
         <div class="progga-kitchen-subtitle">Live Order Queue</div>
@@ -148,6 +148,22 @@
             }
         });
     }, 1000);
+
+    // Mark Item as Unavailable (Cross Button Logic)
+    $(document).on('click', '.mark-unavailable-btn', function() {
+        let detailId = $(this).data('id');
+        let btn = $(this);
+
+        if(confirm("Are you sure this item is unavailable? It will be removed from the bill.")) {
+            btn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm"></i>');
+
+            $.post("{{ route('kitchen.mark_unavailable') }}", { detail_id: detailId }, function(res) {
+                if(res.status === 'success') {
+                    loadLiveOrders(); // বোর্ড রিফ্রেশ করবে
+                }
+            });
+        }
+    });
 
     // Start everything on page load
     loadLiveOrders();

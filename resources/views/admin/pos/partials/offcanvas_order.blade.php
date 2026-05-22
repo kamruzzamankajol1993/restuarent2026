@@ -31,11 +31,20 @@
                 @endif
             </div>
 
-            @foreach($kot->orderDetails as $item)
+           @foreach($kot->orderDetails as $item)
                 @php $addons = json_decode($item->addons, true) ?? []; @endphp
-                <div class="progga-oc-item">
+
+                {{-- Unavailable হলে opacity কমিয়ে দেওয়া হবে --}}
+                <div class="progga-oc-item {{ $item->is_unavailable ? 'opacity-50' : '' }}">
                     <span class="progga-oc-item-name">
-                        {{ $item->product_name }}
+
+                        @if($item->is_unavailable)
+                            <span class="badge bg-danger" style="font-size: 9px; margin-right: 5px;">Unavailable</span>
+                            <del class="text-muted">{{ $item->product_name }}</del>
+                        @else
+                            {{ $item->product_name }}
+                        @endif
+
                         @if(count($addons) > 0)
                             <div style="font-size: 10px; color: #777; font-weight: normal; margin-top: 2px;">
                                 + @foreach($addons as $addon) {{ $addon['name'] }}{{ !$loop->last ? ', ' : '' }} @endforeach
@@ -46,7 +55,14 @@
                         @endif
                     </span>
                     <span class="progga-oc-item-qty">×{{ $item->quantity }}</span>
-                    <span class="progga-oc-item-price">৳{{ number_format($item->subtotal, 2) }}</span>
+
+                    <span class="progga-oc-item-price">
+                        @if($item->is_unavailable)
+                            <del class="text-danger">৳{{ round($item->subtotal) }}</del>
+                        @else
+                            ৳{{ round($item->subtotal) }}
+                        @endif
+                    </span>
                 </div>
             @endforeach
         </div>
@@ -56,28 +72,28 @@
 <div class="progga-oc-footer">
     <div id="ocTotals" style="margin-bottom: 15px;">
         <div class="progga-oc-total-row">
-            <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 2) }}</span>
+            <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 0) }}</span>
         </div>
 
  @if($order->service_charge > 0)
         <div class="progga-oc-total-row">
-            <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span>৳{{ number_format($order->service_charge, 2) }}</span>
+            <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span>৳{{ number_format($order->service_charge, 0) }}</span>
         </div>
         @endif
 
         <div class="progga-oc-total-row">
-            <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span><span>৳{{ number_format($order->vat_tax, 2) }}</span>
+            <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span><span>৳{{ number_format($order->vat_tax, 0) }}</span>
         </div>
 
 
 @if($order->discount_amount > 0)
         <div class="progga-oc-total-row" style="color: #d33;">
             <span>Discount ({{ ucfirst($order->discount_type) }})</span>
-            <span>−৳{{ number_format($order->discount_amount, 2) }}</span>
+            <span>−৳{{ number_format($order->discount_amount, 0) }}</span>
         </div>
         @endif
         <div class="progga-oc-total-row grand">
-            <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 2) }}</span>
+            <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 0) }}</span>
         </div>
     </div>
 
@@ -96,11 +112,14 @@
             $payItems = [];
             foreach($order->kots as $kot) {
                 foreach($kot->orderDetails as $item) {
-                    $payItems[] = [
-                        'name' => $item->product_name,
-                        'qty' => $item->quantity,
-                        'total' => $item->subtotal
-                    ];
+                    // শুধুমাত্র Available আইটেমগুলো পেমেন্ট মোডালে যাবে
+                    if(!$item->is_unavailable) {
+                        $payItems[] = [
+                            'name' => $item->product_name,
+                            'qty' => $item->quantity,
+                            'total' => $item->subtotal
+                        ];
+                    }
                 }
             }
         @endphp

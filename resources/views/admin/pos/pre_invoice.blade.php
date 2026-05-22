@@ -102,20 +102,31 @@
           </tr>
         </thead>
         <tbody>
+
           @foreach($order->orderDetails as $item)
-              @php $addons = json_decode($item->addons, true) ?? []; @endphp
-              <tr>
-                <td>{{ $item->quantity }}</td>
-                <td>
-                  <div class="bill-item-name">{{ $item->product_name }}</div>
-                  @if($item->food_note) <div class="bill-item-note">{{ $item->food_note }}</div> @endif
-                  @if(count($addons) > 0)
-                    <div class="bill-item-note">@foreach($addons as $addon) +{{ $addon['name'] }} @endforeach</div>
-                  @endif
-                </td>
-                <td>{{ number_format($item->subtotal, 2) }}</td>
-              </tr>
+
+              {{-- যদি Unavailable না হয়, তবেই ইনভয়েসে প্রিন্ট হবে --}}
+              @if(!$item->is_unavailable)
+                  @php $addons = json_decode($item->addons, true) ?? []; @endphp
+                  <tr>
+                    <td>{{ $item->quantity }}</td>
+                    <td>
+                      <div class="bill-item-name">{{ $item->product_name }}</div>
+                      @if($item->food_note)
+                        <div class="bill-item-note">{{ $item->food_note }}</div>
+                      @endif
+                      @if(count($addons) > 0)
+                        <div class="bill-item-note">
+                            @foreach($addons as $addon) +{{ $addon['name'] }} @endforeach
+                        </div>
+                      @endif
+                    </td>
+                    <td>{{ round($item->subtotal) }}</td>
+                  </tr>
+              @endif
+
           @endforeach
+     
         </tbody>
       </table>
 
@@ -124,7 +135,7 @@
       <div class="bill-totals">
         <div class="bill-total-row">
           <span>Sub Total</span>
-          <span>{{ number_format($order->subtotal, 2) }}</span>
+          <span>{{ number_format($order->subtotal, 0) }}</span>
         </div>
 
 
@@ -132,25 +143,25 @@
         @if($order->service_charge > 0)
         <div class="bill-total-row">
           <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span>
-          <span>+ {{ number_format($order->service_charge, 2) }}</span>
+          <span>+ {{ number_format($order->service_charge, 0) }}</span>
         </div>
         @endif
 
         @if($order->vat_tax > 0)
         <div class="bill-total-row">
           <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span>
-          <span>+ {{ number_format($order->vat_tax, 2) }}</span>
+          <span>+ {{ number_format($order->vat_tax, 0) }}</span>
         </div>
         @endif
 @if($order->discount_amount > 0)
         <div class="bill-total-row discount">
           <span>Discount ({{ ucfirst($order->discount_type) }})</span>
-          <span>− {{ number_format($order->discount_amount, 2) }}</span>
+          <span>− {{ number_format($order->discount_amount, 0) }}</span>
         </div>
         @endif
         <div class="bill-total-row grand">
           <span>Total Payable</span>
-          <span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->grand_total, 2) }}</span>
+          <span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->grand_total, 0) }}</span>
         </div>
       </div>
 

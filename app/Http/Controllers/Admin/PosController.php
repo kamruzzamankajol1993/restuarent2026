@@ -15,34 +15,198 @@ use App\Models\OrderDetail;
 use App\Models\PointHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
-
+use App\Models\PosSession; // ফাইলের উপরে এটি যুক্ত করতে ভুলবেন না
+use Carbon\Carbon;
 class PosController extends Controller
 {
-   public function index()
-    {
-        $posSetting = DB::table('pos_settings')->first();
-        $categories = FoodCategory::whereNull('parent_category_id')->where('status', 1)->orderBy('sort_order', 'asc')->get();
-        $tables = Table::with('zone')->get();
-        $waiters = Waiter::where('status', 1)->get();
-        $customers = Customer::orderBy('name', 'asc')->get();
+  public function index()
+{
+    $posSetting = DB::table('pos_settings')->first();
+    $categories = FoodCategory::whereNull('parent_category_id')->where('status', 1)->orderBy('sort_order', 'asc')->get();
+    $tables = Table::with('zone')->get();
+    $waiters = Waiter::where('status', 1)->get();
+    $customers = Customer::orderBy('name', 'asc')->get();
 
-        // ডাটাবেজের স্ট্যাটাস ছোট/বড় হাতের যাই থাকুক, তা ঠিকভাবে কাউন্ট করার লজিক
-        $availCount = $tables->filter(function($table) {
-            return strtolower($table->initial_status) === 'available';
-        })->count();
+    $availCount = $tables->filter(function($table) { return strtolower($table->initial_status) === 'available'; })->count();
+    $occCount = $tables->filter(function($table) { return strtolower($table->initial_status) === 'occupied'; })->count();
+    $resCount = $tables->filter(function($table) { return strtolower($table->initial_status) === 'reserved'; })->count();
 
-        $occCount = $tables->filter(function($table) {
-            return strtolower($table->initial_status) === 'occupied';
-        })->count();
+    $activeSession = PosSession::where('user_id', auth()->id())->where('status', 'Open')->first();
+    $requirePreviousSessionClose = false;
 
-        $resCount = $tables->filter(function($table) {
-            return strtolower($table->initial_status) === 'reserved';
-        })->count();
-
-        // compact এর মধ্যে নতুন ভেরিয়েবলগুলো পাস করা হলো
-        return view('admin.pos.index', compact('categories', 'tables', 'waiters', 'customers', 'posSetting', 'availCount', 'occCount', 'resCount'));
+    if ($activeSession) {
+        if ($activeSession->start_time->format('Y-m-d') !== Carbon::now()->format('Y-m-d')) {
+            $requirePreviousSessionClose = true;
+        }
     }
 
+    // সেশন হিস্ট্রি টেবিলের জন্য সব সেশন ডেটা নিয়ে আসা হলো
+    $sessions = PosSession::with('user')->orderBy('id', 'desc')->get();
+
+    return view('admin.pos.index', compact('categories', 'tables', 'waiters', 'customers', 'posSetting', 'availCount', 'occCount', 'resCount', 'activeSession', 'requirePreviousSessionClose', 'sessions'));
+}
+
+public function startSession(Request $request)
+    {
+        PosSession::create([
+            'user_id' => auth()->id(),
+            'weekday' => Carbon::now()->format('l'), // Monday, Tuesday ইত্যাদি
+            'start_time' => Carbon::now(),
+            'status' => 'Open'
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Work period started successfully!']);
+    }
+
+   public function endSession(Request $request)
+    {
+        $session = PosSession::where('id', $request->session_id)
+                             ->where('status', 'Open')
+                             ->firstOrFail();
+
+        $endTime = Carbon::now();
+
+        // শুধু কমপ্লিট হওয়া অর্ডারগুলোর হিসাব বের করা হবে
+        $orders = Order::where('created_at', '>=', $session->start_time)
+                       ->where('created_at', '<=', $endTime)
+                       ->where('status', 'Completed')
+                       ->get();
+
+        $sales_total = $orders->sum('subtotal');
+        $service_charge = $orders->sum('service_charge');
+        $vat_total = $orders->sum('vat_tax');
+        $grand_total = $orders->sum('grand_total');
+
+        // ==========================================
+        // পেমেন্ট মেথড অনুযায়ী Cash, Card এবং MFC হিসাব
+        // ==========================================
+        $cash = 0; $card = 0; $mfc = 0;
+
+        foreach($orders as $order) {
+            if ($order->payment_type == 'Split') {
+                $cash += $order->paid_in_cash;
+                $card += $order->paid_in_card;
+                $mfc += $order->paid_in_mfc;
+            } else {
+                if ($order->payment_type == 'Cash') $cash += $order->total_paid_amount;
+                if ($order->payment_type == 'Card') $card += $order->total_paid_amount;
+                // মোডালে ভ্যালু "Mobile Banking" দেওয়া আছে, কিন্তু আমরা MFC হিসেবে কাউন্ট করছি
+                if ($order->payment_type == 'Mobile Banking') $mfc += $order->total_paid_amount;
+            }
+        }
+
+        // JSON এ সেভ করার জন্য Array তৈরি (একদম আপনার রিকোয়ারমেন্ট অনুযায়ী)
+        $incomes = [
+            'Cash' => $cash,
+            'Card' => $card,
+            'MFC'  => $mfc
+        ];
+
+        // ডিউরেশন ক্যালকুলেশন
+        $durationDiff = $endTime->diffAsCarbonInterval($session->start_time);
+        $duration = $durationDiff->cascade()->forHumans(['short' => true]); // যেমন: 10h 49m
+
+        $session->update([
+            'end_time' => $endTime,
+            'duration' => $duration,
+            'status' => 'Closed',
+            'sales_total' => $sales_total,
+            'service_charge' => $service_charge,
+            'vat_total' => $vat_total,
+            'grand_total' => $grand_total,
+            'incomes_summary' => $incomes // এখানে JSON আপডেট হলো
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Work period ended successfully!',
+            'session_id' => $session->id // প্রিন্টের জন্য
+        ]);
+    }
+
+public function printSessionReport($id)
+    {
+        $session = PosSession::with('user')->findOrFail($id);
+        $restaurant = \App\Models\RestaurantSetting::first();
+        $taxSetting = DB::table('tax_settings')->first();
+        return view('admin.pos.session_report', compact('session', 'restaurant', 'taxSetting'));
+    }
+
+    public function updateSession(Request $request)
+    {
+        $request->validate([
+            'session_id' => 'required',
+            'start_time' => 'required',
+            'status' => 'required'
+        ]);
+
+        $session = PosSession::findOrFail($request->session_id);
+
+        $startTime = Carbon::parse($request->start_time);
+        $endTime = $request->end_time ? Carbon::parse($request->end_time) : null;
+        $duration = null;
+
+        // ডিফল্ট ভ্যালু সেট করা হচ্ছে
+        $sales_total = 0;
+        $service_charge = 0;
+        $vat_total = 0;
+        $grand_total = 0;
+        $incomes = ['Cash' => 0, 'Card' => 0, 'MFC' => 0];
+
+        // যদি সেশন Closed থাকে অথবা এন্ড টাইম দেওয়া হয়, তবে নতুন সময় অনুযায়ী হিসাব রি-ক্যালকুলেট হবে
+        if ($endTime && $request->status == 'Closed') {
+            // ডিউরেশন ক্যালকুলেশন
+            $durationDiff = $endTime->diffAsCarbonInterval($startTime);
+            $duration = $durationDiff->cascade()->forHumans(['short' => true]);
+
+            // নতুন এডিট করা সময় সীমার ভেতরের Completed অর্ডারগুলো নেওয়া হচ্ছে
+            $orders = Order::where('created_at', '>=', $startTime)
+                           ->where('created_at', '<=', $endTime)
+                           ->where('status', 'Completed')
+                           ->get();
+
+            $sales_total = $orders->sum('subtotal');
+            $service_charge = $orders->sum('service_charge');
+            $vat_total = $orders->sum('vat_tax');
+            $grand_total = $orders->sum('grand_total');
+
+            // নতুন করে পেমেন্ট মেথড সামারি তৈরি করা হচ্ছে
+            $cash = 0; $card = 0; $mfc = 0;
+            foreach($orders as $order) {
+                if ($order->payment_type == 'Split') {
+                    $cash += $order->paid_in_cash;
+                    $card += $order->paid_in_card;
+                    $mfc += $order->paid_in_mfc;
+                } else {
+                    if ($order->payment_type == 'Cash') $cash += $order->total_paid_amount;
+                    if ($order->payment_type == 'Card') $card += $order->total_paid_amount;
+                    if ($order->payment_type == 'Mobile Banking') $mfc += $order->total_paid_amount;
+                }
+            }
+
+            $incomes = [
+                'Cash' => $cash,
+                'Card' => $card,
+                'MFC'  => $mfc
+            ];
+        }
+
+        // ডাটাবেজে আপডেট
+        $session->update([
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'weekday' => $startTime->format('l'),
+            'status' => $request->status,
+            'duration' => $duration,
+            'sales_total' => $request->status == 'Closed' ? $sales_total : 0,
+            'service_charge' => $request->status == 'Closed' ? $service_charge : 0,
+            'vat_total' => $request->status == 'Closed' ? $vat_total : 0,
+            'grand_total' => $request->status == 'Closed' ? $grand_total : 0,
+            'incomes_summary' => $request->status == 'Closed' ? $incomes : null
+        ]);
+
+        return response()->json(['status' => 'success', 'message' => 'Session updated and report recalculated successfully!']);
+    }
     public function getFoods(Request $request)
     {
         $posSetting = DB::table('pos_settings')->first();
@@ -57,7 +221,7 @@ class PosController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $foods = $query->paginate($limit);
+        $foods = $query->get();
         return view('admin.pos.partials.food_grid', compact('foods'))->render();
     }
 
@@ -133,7 +297,7 @@ class PosController extends Controller
     }
 
 
-    public function placeOrder(Request $request)
+  public function placeOrder(Request $request)
     {
         $cartKey = $this->getCartKey($request);
         $cart = Session::get($cartKey, []);
@@ -171,14 +335,11 @@ class PosController extends Controller
                 // পুরনো অর্ডারের সাথে নতুন কার্টের বিল যোগ করা
                 $total_subtotal = $order->subtotal + $current_cart_subtotal;
 
-                $discount_amount = ($discount_type == 'percentage')
-                    ? ($total_subtotal * $discount_value) / 100
-                    : $discount_value;
-
-                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ
-                $tax = ($total_subtotal * $vat_rate) / 100;
-                $service_charge = ($total_subtotal * $service_charge_rate) / 100;
-                $grand_total = ($total_subtotal + $tax + $service_charge) - $discount_amount;
+                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ (রাউন্ড ফিগার সহ)
+                $service_charge = round(($total_subtotal * $service_charge_rate) / 100);
+                $tax = round((($total_subtotal + $service_charge) * $vat_rate) / 100);
+                $discount_amount = round(($discount_type == 'percentage') ? ($total_subtotal * $discount_value) / 100 : $discount_value);
+                $grand_total = round(($total_subtotal + $tax + $service_charge) - $discount_amount);
 
                 // শুধু বিল আপডেট হবে, কাস্টমার/ওয়েটার আগেরটাই থাকবে
                 $order->update([
@@ -194,14 +355,11 @@ class PosController extends Controller
 
             } else {
                 // ৩. যদি নতুন অর্ডার হয় (ফ্রেশ কাস্টমার)
-                $discount_amount = ($discount_type == 'percentage')
-                    ? ($current_cart_subtotal * $discount_value) / 100
-                    : $discount_value;
-
-                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ
-                $tax = ($current_cart_subtotal * $vat_rate) / 100;
-                $service_charge = ($current_cart_subtotal * $service_charge_rate) / 100;
-                $grand_total = ($current_cart_subtotal + $tax + $service_charge) - $discount_amount;
+                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ (রাউন্ড ফিগার সহ)
+                $service_charge = round(($current_cart_subtotal * $service_charge_rate) / 100);
+                $tax = round((($current_cart_subtotal + $service_charge) * $vat_rate) / 100);
+                $discount_amount = round(($discount_type == 'percentage') ? ($current_cart_subtotal * $discount_value) / 100 : $discount_value);
+                $grand_total = round(($current_cart_subtotal + $tax + $service_charge) - $discount_amount);
 
                 $customerId = null;
                 if ($request->is_walk_in == '0') {
@@ -275,8 +433,7 @@ class PosController extends Controller
         }
     }
 
-
-   public function completePayment(Request $request)
+    public function completePayment(Request $request)
     {
         DB::beginTransaction();
         try {
@@ -302,11 +459,13 @@ class PosController extends Controller
                 }
 
                 $order = new Order();
-                $order->order_number = time(); // অথবা আপনার ইনভয়েস সেটিং অনুযায়ী
                 $order->order_type = ucfirst($order_type); // Takeaway or Delivery
                 $order->subtotal = $subtotal;
                 $order->user_id = auth()->id() ?? 1;
                 $order->order_time = now();
+
+                // অর্ডার নাম্বার আগে সেভ করতে হবে, যাতে OrderDetails এর জন্য Order ID পাওয়া যায়
+                $order->save();
             }
 
             $subtotal = $order->subtotal;
@@ -317,13 +476,11 @@ class PosController extends Controller
             $discount_value = $request->discount_value ?? 0;
             $discount_type = $request->discount_type ?? 'fixed';
 
-            $discount_amount = ($discount_type == 'percentage')
-                ? ($subtotal * $discount_value) / 100
-                : $discount_value;
-
-            $tax = ($subtotal * $vat_rate) / 100;
-            $service_charge = ($subtotal * $service_charge_rate) / 100;
-            $grand_total = ($subtotal + $tax + $service_charge) - $discount_amount;
+            // ভ্যাট, সার্ভিস চার্জ এবং ডিসকাউন্ট ক্যালকুলেশন (রাউন্ড ফিগার সহ)
+            $service_charge = round(($subtotal * $service_charge_rate) / 100);
+            $tax = round((($subtotal + $service_charge) * $vat_rate) / 100);
+            $discount_amount = round(($discount_type == 'percentage') ? ($subtotal * $discount_value) / 100 : $discount_value);
+            $grand_total = round(($subtotal + $tax + $service_charge) - $discount_amount);
 
             // ===============================================
             // পেমেন্ট স্প্লিট এবং Due ক্যালকুলেশন
@@ -340,28 +497,31 @@ class PosController extends Controller
             $due = $grand_total - $totalPaid;
             if($due < 0) $due = 0; // যদি কাস্টমার বেশি টাকা দেয়, তবে Due 0 থাকবে।
 
-            // update() এর পরিবর্তে fill()->save() ব্যবহার করা হলো যাতে নতুন অর্ডার ডাটাবেজে আগে Insert হয়
-            $order->fill([
-                'discount_type'     => $discount_type,
-                'discount_amount'   => $discount_amount,
-                'vat_tax'           => $tax,
-                'service_charge'    => $service_charge,
-                'grand_total'       => $grand_total,
-                'payment_type'      => $paymentMethod,
-                'transaction_id'    => $request->transaction_id,
-                'status'            => 'Completed',
-                'due'               => $due,
-                'total_paid_amount' => $totalPaid,
-                'paid_in_cash'      => $cash,
-                'paid_in_card'      => $card,
-                'paid_in_mfc'       => $mfc
-            ])->save();
+            // ===============================================
+            // মডেলের মাস অ্যাসাইনমেন্ট রেসট্রিকশন এড়াতে সরাসরি প্রপার্টি সেট করে সেভ করা
+            // ===============================================
+            $order->discount_type     = $discount_type;
+            $order->discount_amount   = $discount_amount;
+            $order->vat_tax           = $tax;
+            $order->service_charge    = $service_charge;
+            $order->grand_total       = $grand_total;
+            $order->payment_type      = $paymentMethod;
+            $order->transaction_id    = $request->transaction_id;
+            $order->status            = 'Completed'; // স্ট্যাটাস ১০০% আপডেট হবে
+            $order->due               = $due;
+            $order->total_paid_amount = $totalPaid;
+            $order->paid_in_cash      = $cash;
+            $order->paid_in_card      = $card;
+            $order->paid_in_mfc       = $mfc;
+
+            $order->save();
 
             if (!$request->filled('order_id')) {
                 // সরাসরি কার্ট থেকে পেমেন্ট হলে OrderDetails এ ডাটা সেভ করা
                 $order_type = $request->order_type ?? 'takeaway';
                 $cartKey = ($order_type == 'delivery') ? 'pos_cart_delivery' : 'pos_cart_takeaway';
 
+                $cart = Session::get($cartKey, []);
                 foreach ($cart as $item) {
                     OrderDetail::create([
                         'order_id'     => $order->id, // এখন $order->id ঠিকমতো পাবে
@@ -481,9 +641,10 @@ class PosController extends Controller
         $vat_rate = $taxSetting->vat_rate ?? 0;
         $service_rate = $taxSetting->service_charge ?? 0;
 
-        $tax = ($subtotal * $vat_rate) / 100;
-        $service = ($subtotal * $service_rate) / 100;
-        $grand_total = ($subtotal + $tax + $service) - $discount_amount;
+        $service = round(($subtotal * $service_rate) / 100);
+$tax = round((($subtotal + $service) * $vat_rate) / 100);
+$discount_amount = round(($disc_type == 'percentage') ? ($subtotal * $disc_val) / 100 : $disc_val);
+$grand_total = round(($subtotal + $tax + $service) - $discount_amount);
 
         // শুধু ভিউয়ের জন্য সাময়িকভাবে ডাটাগুলো ওভাররাইড করা হলো (ডাটাবেজে সেভ হবে না)
         $order->discount_type = $disc_type;

@@ -22,7 +22,7 @@
       <div class="pos-cart-fab" id="posCartFab" style="display: none;">
         <span class="pos-cart-fab-count" id="fabCartCount">0</span>
         <span class="pos-cart-fab-label">View Cart</span>
-        <span class="pos-cart-fab-total" id="fabCartTotal">৳0.00</span>
+        <span class="pos-cart-fab-total" id="fabCartTotal">৳0</span>
         <i class="bi bi-chevron-up"></i>
       </div>
     </div>

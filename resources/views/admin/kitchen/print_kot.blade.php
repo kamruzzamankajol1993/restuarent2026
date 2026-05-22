@@ -274,24 +274,26 @@
       <div class="kot-section-head">Order Items</div>
       <div class="kot-items">
         @foreach($kot->orderDetails as $item)
+          @if(!$item->is_unavailable)
             @php $addons = json_decode($item->addons, true) ?? []; @endphp
             <div class="kot-item">
-            <div class="kot-qty-wrap">
-                <div class="kot-qty">{{ $item->quantity }}</div>
-                <div class="kot-qty-label">pcs</div>
+              <div class="kot-qty-wrap">
+                  <div class="kot-qty">{{ $item->quantity }}</div>
+                  <div class="kot-qty-label">pcs</div>
+              </div>
+              <div class="kot-item-info">
+                  <div class="kot-item-name">{{ $item->product_name }}</div>
+                  @if($item->food_note)
+                      <div class="kot-item-note">{{ $item->food_note }}</div>
+                  @endif
+                  @if(count($addons) > 0)
+                      <div class="kot-item-note" style="color: #666; font-style: normal;">
+                          @foreach($addons as $addon) +{{ $addon['name'] }} @endforeach
+                      </div>
+                  @endif
+              </div>
             </div>
-            <div class="kot-item-info">
-                <div class="kot-item-name">{{ $item->product_name }}</div>
-                @if($item->food_note)
-                    <div class="kot-item-note">{{ $item->food_note }}</div>
-                @endif
-                @if(count($addons) > 0)
-                    <div class="kot-item-note" style="color: #666; font-style: normal;">
-                        @foreach($addons as $addon) +{{ $addon['name'] }} @endforeach
-                    </div>
-                @endif
-            </div>
-            </div>
+          @endif
         @endforeach
       </div>
 
