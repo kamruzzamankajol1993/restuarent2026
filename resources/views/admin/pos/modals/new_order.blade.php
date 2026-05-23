@@ -38,10 +38,23 @@
               <div class="col-7">
                 <div class="pos-modal-label">Assign Waiter</div>
                 <select id="posWaiterSelect" class="progga-select w-100">
-                  <option value="">— Unassigned —</option>
-                  @foreach($waiters as $waiter)
-                    <option value="{{ $waiter->id }}">{{ $waiter->name }}</option>
-                  @endforeach
+                  @if(auth()->check() && auth()->user()->hasRole('waiter'))
+                      {{-- যদি ওয়েটার লগইন করে থাকে, তবে শুধু তার নামটাই দেখাবে এবং সিলেক্টেড থাকবে --}}
+                      @php
+                          $loggedInWaiter = collect($waiters)->firstWhere('user_id', auth()->id());
+                      @endphp
+                      @if($loggedInWaiter)
+                          <option value="{{ $loggedInWaiter->id }}" selected>{{ $loggedInWaiter->name }}</option>
+                      @else
+                          <option value="">— Profile Not Found —</option>
+                      @endif
+                  @else
+                      {{-- যদি এডমিন বা ফ্রন্ট ডেস্ক লগইন করে, তবে সবার নাম দেখাবে --}}
+                      <option value="">— Unassigned —</option>
+                      @foreach($waiters as $waiter)
+                        <option value="{{ $waiter->id }}">{{ $waiter->name }}</option>
+                      @endforeach
+                  @endif
                 </select>
               </div>
             </div>

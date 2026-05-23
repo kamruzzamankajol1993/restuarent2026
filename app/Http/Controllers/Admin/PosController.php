@@ -297,7 +297,7 @@ public function printSessionReport($id)
     }
 
 
-  public function placeOrder(Request $request)
+public function placeOrder(Request $request)
     {
         $cartKey = $this->getCartKey($request);
         $cart = Session::get($cartKey, []);
@@ -308,6 +308,10 @@ public function printSessionReport($id)
 
         DB::beginTransaction();
         try {
+            // ইউজারের রোল অনুযায়ী স্ট্যাটাস নির্ধারণ
+            $isWaiter = auth()->user()->hasRole('waiter');
+            $newStatus = $isWaiter ? 'Waiter_Hold' : 'Pending';
+
             // ১. কার্টে থাকা আইটেমের টোটাল হিসাব করা
             $current_cart_subtotal = 0;
             foreach ($cart as $item) {
@@ -316,26 +320,24 @@ public function printSessionReport($id)
 
             $taxSetting = DB::table('tax_settings')->first();
             $vat_rate = $taxSetting->vat_rate ?? 0;
-
-            // শুধু Dine-In এর জন্য সার্ভিস চার্জ
             $service_charge_rate = ($request->order_type == 'dine_in') ? ($taxSetting->service_charge ?? 0) : 0;
-
             $discount_value = $request->discount_value ?? 0;
             $discount_type = $request->discount_type ?? 'fixed';
 
-            // Order Type সেভ করার লজিক
             $order_type_val = 'Dine-In';
             if($request->order_type == 'takeaway') $order_type_val = 'Takeaway';
             if($request->order_type == 'delivery') $order_type_val = 'Delivery';
 
-            // ২. চেক করা: এটি কি পুরনো অর্ডার / QR Hold অর্ডার?
             if ($request->filled('order_id')) {
                 $order = Order::findOrFail($request->order_id);
-                $normalizedStatus = str_replace(['-', ' '], '_', strtolower(trim($order->status ?? '')));
-                $isQrHoldOrder = in_array($normalizedStatus, ['qr_hold', 'qrhold', 'hold']);
 
-                if ($isQrHoldOrder) {
-                    // QR Hold অর্ডার হলে আগের QR আইটেমগুলো কার্ট থেকে নতুন করে রিপ্লেস হবে
+                // চেক করা হচ্ছে অর্ডারে আগে থেকেই কোনো একটিভ (Pending/Cooking/Ready) KOT আছে কি না
+                $hasActiveKots = OrderKot::where('order_id', $order->id)->where('kitchen_status', '!=', 'Hold')->exists();
+
+                if (!$hasActiveKots) {
+                    // ==========================================
+                    // অবস্থা ১: সম্পূর্ণ ফ্রেশ অর্ডার (শুধু Hold/QR KOT আছে)
+                    // ==========================================
                     $service_charge = round(($current_cart_subtotal * $service_charge_rate) / 100);
                     $tax = round((($current_cart_subtotal + $service_charge) * $vat_rate) / 100);
                     $discount_amount = round(($discount_type == 'percentage') ? ($current_cart_subtotal * $discount_value) / 100 : $discount_value);
@@ -356,32 +358,53 @@ public function printSessionReport($id)
                         $customerId = null;
                     }
 
-                    $order->customer_id = $customerId;
-                    $order->waiter_id = $request->waiter_id ?: $order->waiter_id;
-                    $order->user_id = $order->user_id ?: (auth()->id() ?? 1);
-                    $order->order_type = $order_type_val;
-                    $order->subtotal = $current_cart_subtotal;
-                    $order->discount_amount = $discount_amount;
-                    $order->discount_type = $discount_type;
-                    $order->vat_tax = $tax;
-                    $order->service_charge = $service_charge;
-                    $order->grand_total = $grand_total;
-                    $order->due = $grand_total;
-                    $order->status = 'Pending';
-                    $order->notes = $request->order_notes ?? $order->notes;
-                    $order->preparation_time = $request->preparation_time ?? 20;
-                    $order->save();
+                    $order->update([
+                        'customer_id' => $customerId,
+                        'waiter_id' => $request->waiter_id ?: $order->waiter_id,
+                        'user_id' => $order->user_id ?: (auth()->id() ?? 1),
+                        'order_type' => $order_type_val,
+                        'subtotal' => $current_cart_subtotal,
+                        'discount_amount' => $discount_amount,
+                        'discount_type' => $discount_type,
+                        'vat_tax' => $tax,
+                        'service_charge' => $service_charge,
+                        'grand_total' => $grand_total,
+                        'due' => $grand_total,
+                        'status' => $newStatus,
+                        'notes' => $request->order_notes ?? $order->notes,
+                        'preparation_time' => $request->preparation_time ?? 20
+                    ]);
 
-                    // QR থেকে আসা পুরনো details মুছে কার্টের আপডেটেড আইটেম দিয়ে নতুন KOT details তৈরি হবে
+                    // ডুপ্লিকেট রোধে আগের Hold আইটেম মুছে ফেলা হলো
                     OrderDetail::where('order_id', $order->id)->delete();
+                    OrderKot::where('order_id', $order->id)->delete();
 
                     if ($order->table_id) {
                         Table::where('id', $order->table_id)->update(['initial_status' => 'Occupied']);
                     }
-                } else {
-                    // পুরনো Pending অর্ডারের সাথে নতুন কার্টের বিল যোগ করা (Add More Food)
-                    $total_subtotal = $order->subtotal + $current_cart_subtotal;
 
+                } else {
+                    // ==========================================
+                    // অবস্থা ২: Add More Food (আগে থেকেই কিচেনে রান্না চলছে, ওয়েটার নতুন খাবার যোগ করেছে)
+                    // ==========================================
+
+                    // ১. ফ্রন্ট ডেস্ক যখন কার্ট এপ্রুভ করবে, তখন আগের তৈরি হওয়া ডামি 'Hold' KOT ডিলিট করে সাবটোটাল মাইনাস করতে হবে (যাতে ডাবল বিল না হয়)
+                    $holdKots = OrderKot::where('order_id', $order->id)->where('kitchen_status', 'Hold')->get();
+                    if ($holdKots->count() > 0) {
+                        $holdSubtotal = 0;
+                        foreach ($holdKots as $hk) {
+                            $hk_details = OrderDetail::where('order_kot_id', $hk->id)->get();
+                            foreach($hk_details as $hkd) {
+                                $holdSubtotal += $hkd->subtotal;
+                            }
+                            OrderDetail::where('order_kot_id', $hk->id)->delete();
+                            $hk->delete();
+                        }
+                        $order->subtotal -= $holdSubtotal;
+                    }
+
+                    // ২. নতুন কার্টের অ্যামাউন্ট অর্ডারের সাথে যোগ করা
+                    $total_subtotal = $order->subtotal + $current_cart_subtotal;
                     $service_charge = round(($total_subtotal * $service_charge_rate) / 100);
                     $tax = round((($total_subtotal + $service_charge) * $vat_rate) / 100);
                     $discount_amount = round(($discount_type == 'percentage') ? ($total_subtotal * $discount_value) / 100 : $discount_value);
@@ -396,11 +419,14 @@ public function printSessionReport($id)
                         'grand_total' => $grand_total,
                         'preparation_time' => $request->preparation_time ?? 20,
                         'due' => $grand_total,
+                        'status' => $newStatus // ওয়েটার করলে Waiter_Hold, ফ্রন্ট ডেস্ক করলে Pending হবে
                     ]);
                 }
 
             } else {
-                // ৩. যদি নতুন অর্ডার হয় (ফ্রেশ কাস্টমার)
+                // ==========================================
+                // অবস্থা ৩: একদম নতুন অর্ডার
+                // ==========================================
                 $service_charge = round(($current_cart_subtotal * $service_charge_rate) / 100);
                 $tax = round((($current_cart_subtotal + $service_charge) * $vat_rate) / 100);
                 $discount_amount = round(($discount_type == 'percentage') ? ($current_cart_subtotal * $discount_value) / 100 : $discount_value);
@@ -416,7 +442,6 @@ public function printSessionReport($id)
                     }
                 }
 
-                // নতুন অর্ডার তৈরি
                 $order = Order::create([
                     'customer_id' => $customerId,
                     'table_id' => ($request->order_type == 'takeaway' || $request->order_type == 'delivery') ? null : $request->table_id,
@@ -430,7 +455,7 @@ public function printSessionReport($id)
                     'service_charge' => $service_charge,
                     'grand_total' => $grand_total,
                     'due' => $grand_total,
-                    'status' => 'Pending',
+                    'status' => $newStatus,
                     'notes' => $request->order_notes,
                     'order_time' => now(),
                     'preparation_time' => $request->preparation_time ?? 20
@@ -441,15 +466,15 @@ public function printSessionReport($id)
                 }
             }
 
-            // ৪. এই অর্ডারের আন্ডারে নতুন KOT জেনারেট করা
+            // নতুন KOT জেনারেট করা
             $kotCount = OrderKot::where('order_id', $order->id)->count();
             $kot = OrderKot::create([
                 'order_id' => $order->id,
                 'kot_number' => 'KOT-' . ($kotCount + 1),
-                'kitchen_status' => 'Pending'
+                'kitchen_status' => $isWaiter ? 'Hold' : 'Pending' // ওয়েটার হলে হোল্ড হবে
             ]);
 
-            // ৫. কার্টের আইটেমগুলো নতুন KOT-তে সেভ করা
+            // কার্টের আইটেমগুলো নতুন KOT-তে সেভ করা
             foreach ($cart as $item) {
                 OrderDetail::create([
                     'order_id' => $order->id,
@@ -469,15 +494,97 @@ public function printSessionReport($id)
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')',
+                'message' => $isWaiter ? 'Order Sent to Front Desk!' : 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')',
                 'kot_id' => $kot->id,
-                'redirect_url' => route('kitchen.print_kot', ['id' => $kot->id, 'source' => 'pos'])
+                'redirect_url' => $isWaiter ? route('pos.index') : route('kitchen.print_kot', ['id' => $kot->id, 'source' => 'pos'])
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+
+    public function getTableOrder($table_id)
+    {
+        // Cooking এবং Ready স্টেটাস যুক্ত করা হলো যাতে সব ধরনের রানিং অর্ডার পাওয়া যায়
+        $order = Order::with(['kots.orderDetails', 'orderDetails', 'waiter', 'customer', 'table'])
+                      ->where('table_id', $table_id)
+                      ->whereIn('status', ['Pending', 'Waiter_Hold', 'Cooking', 'Ready'])
+                      ->first();
+
+        if(!$order) return response()->json(['status' => 'error', 'message' => 'No active order found.']);
+
+        $isWaiter = auth()->user()->hasRole('waiter');
+
+        // চেক করা হচ্ছে অর্ডারে কোনো Hold KOT আছে কি না (অর্থাৎ ওয়েটার নতুন কিছু অ্যাড করেছে কি না)
+        $holdKots = $order->kots->where('kitchen_status', 'Hold');
+
+        // ফ্রন্ট ডেস্ক যদি ক্লিক করে এবং কোনো Hold KOT থাকে, তবে সরাসরি কার্টে লোড হবে (অফক্যানভাস নয়)
+        if ($holdKots->count() > 0 && !$isWaiter) {
+            $cart = [];
+
+            // শুধুমাত্র Hold হওয়া আইটেমগুলো কার্টে নিয়ে আসা হচ্ছে
+            foreach ($holdKots as $kot) {
+                foreach ($kot->orderDetails as $detail) {
+                    if (!empty($detail->is_unavailable)) continue;
+
+                    $addons = json_decode($detail->addons ?? '[]', true);
+                    if (!is_array($addons)) $addons = [];
+
+                    $addonTotal = 0;
+                    foreach ($addons as $addon) {
+                        $addonTotal += (float) ($addon['price'] ?? 0);
+                    }
+
+                    $qty = (int) ($detail->quantity ?: 1);
+                    $price = (float) ($detail->price ?? 0);
+
+                    if ($price <= 0 && $qty > 0) {
+                        $price = round(((float) $detail->subtotal / $qty) - $addonTotal, 2);
+                    }
+
+                    if ($price < 0) {
+                        $price = 0;
+                    }
+
+                    $cart['wh_' . $detail->id] = [
+                        'food_id' => $detail->product_id,
+                        'name' => $detail->product_name,
+                        'qty' => $qty,
+                        'price' => $price,
+                        'addon_total' => $addonTotal,
+                        'addons' => $addons,
+                        'note' => $detail->food_note ?? ''
+                    ];
+                }
+            }
+
+            $cartKey = 'pos_cart_table_' . $order->table_id;
+            Session::put($cartKey, $cart);
+
+            return response()->json([
+                'status' => 'load_cart',
+                'order_data' => [
+                    'order_id' => $order->id,
+                    'table_id' => $order->table_id,
+                    'table_number' => $order->table->table_number ?? ('Table ' . $order->table_id),
+                    'waiter_id' => $order->waiter_id,
+                    'waiter_name' => $order->waiter->name ?? '',
+                    'customer_id' => $order->customer_id,
+                    'customer_name' => $order->customer->name ?? 'Walk-in Customer',
+                    'customer_phone' => $order->customer->phone ?? '',
+                    'is_walk_in' => $order->customer_id ? 0 : 1,
+                    'notes' => $order->notes ?? '',
+                    'subtotal' => $order->subtotal
+                ]
+            ]);
+        }
+
+        // যদি কোনো Hold KOT না থাকে (সব কিচেনে চলে গেছে), বা ওয়েটার নিজে ক্লিক করে, তবে আগের মতোই অফক্যানভাস খুলবে
+        $kitchenBusy = $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking'])->exists();
+        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
     }
 
     public function holdWebOrder(Request $request)
@@ -807,18 +914,18 @@ public function printSessionReport($id)
 
 
     // (getTableOrder এবং completePayment মেথড আগের মতোই থাকবে...)
-    public function getTableOrder($table_id)
-    {
-        $order = Order::with(['kots.orderDetails', 'waiter', 'customer', 'table'])
-                      ->where('table_id', $table_id)
-                      ->where('status', 'Pending')
-                      ->first();
+    // public function getTableOrder($table_id)
+    // {
+    //     $order = Order::with(['kots.orderDetails', 'waiter', 'customer', 'table'])
+    //                   ->where('table_id', $table_id)
+    //                   ->where('status', 'Pending')
+    //                   ->first();
 
-        if(!$order) return response()->json(['status' => 'error', 'message' => 'No active order found.']);
+    //     if(!$order) return response()->json(['status' => 'error', 'message' => 'No active order found.']);
 
-        $kitchenBusy = $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking'])->exists();
-        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
-    }
+    //     $kitchenBusy = $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking'])->exists();
+    //     return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
+    // }
 
 
 

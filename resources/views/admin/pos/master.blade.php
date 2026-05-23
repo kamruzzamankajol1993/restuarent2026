@@ -220,7 +220,7 @@
 
 $(document).ready(function() {
     let isPolling = true;
-
+let isMasterWaiter = @json(auth()->check() && auth()->user()->hasRole('waiter'));
     $.ajaxSetup({
         headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
     });
@@ -248,6 +248,8 @@ $(document).ready(function() {
         }
     }
 
+  
+
     function checkLiveNotifications() {
         if ($('.modal.show').length > 0 || !isPolling) return;
 
@@ -256,7 +258,9 @@ $(document).ready(function() {
             type: "GET",
             success: function(res) {
                 if (res.status === 'success') {
-                    if (res.order) {
+
+                    // ওয়েটার লগইন থাকলে QR অর্ডারের মোডাল আসবে না
+                    if (res.order && !isMasterWaiter) {
                         isPolling = false;
                         playSound();
 
@@ -296,6 +300,7 @@ $(document).ready(function() {
                         return;
                     }
 
+                    // Waiter Call নোটিফিকেশন সবাই দেখতে পাবে (বা চাইলে এখানেও !isMasterWaiter দিতে পারেন)
                     if (res.waiter_call) {
                         isPolling = false;
                         playSound();

@@ -22,37 +22,45 @@
 @section('body')
 <div class="progga-pos-wrapper">
    <div class="progga-pos-header">
-  <div class="progga-pos-logo">
-    @if(!empty($restaurantSettingIconName))
-        <img src="{{ asset('public/'.$restaurantSettingIconName) }}" alt="Icon" style="width: 60px; height: 60px; object-fit: contain;">
-    @else
-        {{ strtoupper(substr($restaurantSettingName ?? 'P', 0, 1)) }}
-    @endif
-    <span>GOLPO KHANA</span>
-  </div>
+      <div class="progga-pos-logo">
+        @if(!empty($restaurantSettingIconName))
+            <img src="{{ asset('public/'.$restaurantSettingIconName) }}" alt="Icon" style="width: 60px; height: 60px; object-fit: contain;">
+        @else
+            {{ strtoupper(substr($restaurantSettingName ?? 'P', 0, 1)) }}
+        @endif
+        <span>GOLPO KHANA</span>
+      </div>
 
-  <div class="progga-pos-step-indicator">
-    <div class="progga-pos-step active" id="indStep1"><span class="progga-pos-step-num">1</span> Table</div>
-    <span class="progga-pos-step-divider">›</span>
-    <div class="progga-pos-step" id="indStep2"><span class="progga-pos-step-num">2</span> Order</div>
-  </div>
+      <div class="progga-pos-step-indicator">
+        <div class="progga-pos-step active" id="indStep1"><span class="progga-pos-step-num">1</span> Table</div>
+        <span class="progga-pos-step-divider">›</span>
+        <div class="progga-pos-step" id="indStep2"><span class="progga-pos-step-num">2</span> Order</div>
+      </div>
 
-  <div class="d-flex align-items-center" style="gap: 15px;">
-    @if($activeSession)
-    <button type="button" class="progga-btn progga-btn-danger progga-btn-sm" onclick="confirmEndSession({{ $activeSession->id }})" title="End Shift & Print Report">
-        <i class="bi bi-stop-circle"></i> End Shift
-    </button>
-@endif
-
-    <a href="{{ url('/clear') }}" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" title="Clear System Cache">
-        <i class="bi bi-arrow-clockwise"></i> Clear Cache
-    </a>
-    <button type="button" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" data-bs-toggle="modal" data-bs-target="#sessionHistoryModal">
-    <i class="bi bi-history"></i> Session History
-</button>
-    <a href="{{ route('home') }}" class="progga-pos-close m-0"><i class="bi bi-x-lg"></i></a>
-  </div>
-</div>
+      <div class="d-flex align-items-center" style="gap: 15px;">
+        @if(!auth()->user()->hasRole('waiter'))
+            @if($activeSession)
+                <button type="button" class="progga-btn progga-btn-danger progga-btn-sm" onclick="confirmEndSession({{ $activeSession->id }})" title="End Shift & Print Report">
+                    <i class="bi bi-stop-circle"></i> End Shift
+                </button>
+            @endif
+            <a href="{{ url('/clear') }}" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" title="Clear System Cache">
+                <i class="bi bi-arrow-clockwise"></i> Clear Cache
+            </a>
+            <button type="button" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" data-bs-toggle="modal" data-bs-target="#sessionHistoryModal">
+                <i class="bi bi-history"></i> Session History
+            </button>
+            <a href="{{ route('home') }}" class="progga-pos-close m-0"><i class="bi bi-x-lg"></i></a>
+        @else
+            <form action="{{ route('logout') }}" method="POST" class="m-0 p-0">
+                @csrf
+                <button type="submit" class="progga-btn progga-btn-danger progga-btn-sm" title="Logout from POS">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </form>
+        @endif
+      </div>
+    </div>
 
     <div class="progga-pos-body">
         @include('admin.pos.step1_tables')
@@ -64,6 +72,7 @@
 @include('admin.pos.modals.addon')
 @include('admin.pos.modals.payment')
 @include('admin.pos.partials.offcanvas_wrapper')
+
 <div class="modal fade progga-modal" id="startSessionModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
@@ -99,111 +108,116 @@
 </div>
 @endif
 
-<div class="modal fade progga-modal" id="sessionHistoryModal" tabindex="-1">
+<div class="modal fade progga-modal" id="sessionHistoryModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-table me-2"></i>Work Period Sessions</h5>
+                <h5 class="modal-title fw-bold" id="sessionModalTitle">
+                    <i class="bi bi-table me-2"></i>Work Period Sessions
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-3" style="max-height: 500px; overflow-y: auto;">
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered align-middle text-center" style="font-size: 13px;">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>ID</th>
-                                <th>Employee</th>
-                                <th>Day</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
-                                <th>Duration</th>
-                                <th>Grand Total</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($sessions as $key => $sess)
+
+                <div id="sessionListView">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered align-middle text-center" style="font-size: 13px;">
+                            <thead class="table-dark">
                                 <tr>
-                                    <td><strong>#{{ $key+1 }}</strong></td>
-                                    <td>{{ $sess->user->name ?? 'N/A' }}</td>
-                                    <td><span class="badge bg-secondary">{{ $sess->weekday }}</span></td>
-                                    <td>{{ $sess->start_time->format('d M y - h:i A') }}</td>
-                                    <td>{{ $sess->end_time ? $sess->end_time->format('d M y - h:i A') : '—' }}</td>
-                                    <td>{{ $sess->duration ?? 'Running' }}</td>
-                                    <td><strong>৳{{ round($sess->grand_total) }}</strong></td>
-                                    <td>
-                                        <span class="badge {{ $sess->status == 'Open' ? 'bg-success' : 'bg-danger' }}">
-                                            {{ $sess->status }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex gap-1 justify-content-center">
-                                           <button type="button"
-        class="btn btn-sm btn-primary btnEditSession"
-        data-id="{{ $sess->id }}"
-        data-start="{{ $sess->start_time ? $sess->start_time->format('Y-m-d\TH:i') : '' }}"
-        data-end="{{ $sess->end_time ? $sess->end_time->format('Y-m-d\TH:i') : '' }}"
-        data-status="{{ $sess->status }}">
-    <i class="bi bi-pencil-square"></i> Edit
-</button>
-                                            @if($sess->status == 'Closed')
-                                                <a href="{{ route('pos.session.report', $sess->id) }}" target="_blank" class="btn btn-sm btn-warning fw-bold">
-                                                    <i class="bi bi-printer"></i> Print
-                                                </a>
-                                            @endif
-                                        </div>
-                                    </td>
+                                    <th>ID</th>
+                                    <th>Employee</th>
+                                    <th>Day</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Duration</th>
+                                    <th>Grand Total</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="9" class="text-muted py-4">No sessions found!</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @forelse($sessions ?? [] as $key => $sess)
+                                    <tr>
+                                        <td><strong>#{{ $key+1 }}</strong></td>
+                                        <td>{{ $sess->user->name ?? 'N/A' }}</td>
+                                        <td><span class="badge bg-secondary">{{ $sess->weekday }}</span></td>
+                                        <td>{{ $sess->start_time->format('d M y - h:i A') }}</td>
+                                        <td>{{ $sess->end_time ? $sess->end_time->format('d M y - h:i A') : '—' }}</td>
+                                        <td>{{ $sess->duration ?? 'Running' }}</td>
+                                        <td><strong>৳{{ round($sess->grand_total) }}</strong></td>
+                                        <td>
+                                            <span class="badge {{ $sess->status == 'Open' ? 'bg-success' : 'bg-danger' }}">
+                                                {{ $sess->status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-1 justify-content-center">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-primary btnEditSession"
+                                                    data-id="{{ $sess->id }}"
+                                                    data-start="{{ $sess->start_time ? $sess->start_time->format('Y-m-d\TH:i') : '' }}"
+                                                    data-end="{{ $sess->end_time ? $sess->end_time->format('Y-m-d\TH:i') : '' }}"
+                                                    data-status="{{ $sess->status }}">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </button>
+                                                @if($sess->status == 'Closed')
+                                                    <a href="{{ route('pos.session.report', $sess->id) }}" target="_blank" class="btn btn-sm btn-warning fw-bold">
+                                                        <i class="bi bi-printer"></i> Print
+                                                    </a>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="9" class="text-muted py-4">No sessions found!</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+
+                <div id="sessionEditView" style="display: none;">
+                    <form id="inlineEditSessionForm">
+                        <input type="hidden" id="inlineEditSessionId" name="session_id">
+
+                        <div class="row mt-2">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold" style="font-size: 13px;">Start Time</label>
+                                <input type="datetime-local" id="inlineEditStartTime" name="start_time" class="form-control" required>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold" style="font-size: 13px;">End Time</label>
+                                <input type="datetime-local" id="inlineEditEndTime" name="end_time" class="form-control">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold" style="font-size: 13px;">Status</label>
+                                <select id="inlineEditStatus" name="status" class="form-control">
+                                    <option value="Open">Open</option>
+                                    <option value="Closed">Closed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-3 border-top pt-3">
+                            <button type="button" class="btn btn-secondary fw-bold" id="btnCancelEdit">
+                                <i class="bi bi-arrow-left"></i> Back to List
+                            </button>
+                            <button type="submit" class="btn btn-primary fw-bold">
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade progga-modal" id="editSessionModal" tabindex="-1" style="z-index: 1056;">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Session #<span id="editSessIdLabel"></span></h5>
-                <button type="button" class="btn-close btn-close-white" onclick="$('#editSessionModal').modal('hide')"></button>
-            </div>
-            <form id="editSessionForm">
-                <div class="modal-body p-3">
-                    <input type="hidden" id="editSessionId" name="session_id">
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size: 12px;">Start Time</label>
-                        <input type="datetime-local" id="editStartTime" name="start_time" class="form-control" required style="font-size: 13px;">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" style="font-size: 12px;">End Time</label>
-                        <input type="datetime-local" id="editEndTime" name="end_time" class="form-control" style="font-size: 13px;">
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label fw-bold" style="font-size: 12px;">Status</label>
-                        <select id="editStatus" name="status" class="form-control" style="font-size: 13px;">
-                            <option value="Open">Open</option>
-                            <option value="Closed">Closed</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer p-2">
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 @endsection
 
 @section('script')
@@ -217,8 +231,28 @@
         customer_phone: '', is_walk_in: 1, order_notes: ''
     };
     let currentCat = '';
+    let isWaiter = @json(auth()->user()->hasRole('waiter'));
 
-    $(document).ready(function() { loadFoods(''); });
+    $(document).ready(function() {
+        let hasActiveSession = "{{ isset($activeSession) && $activeSession ? 'yes' : 'no' }}";
+        let requiresClose = "{{ $requirePreviousSessionClose ?? false }}";
+
+        // ওয়েটার না হলে তবেই সেশন মোডাল দেখাবে
+        if (!isWaiter) {
+            if (hasActiveSession === 'no') {
+                $('#startSessionModal').modal('show');
+            } else if (requiresClose === '1') {
+                $('#previousSessionModal').modal('show');
+            }
+        }
+
+        // বাটন টেক্সট পরিবর্তন
+        if(isWaiter) {
+            $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Front Desk');
+        }
+
+        loadFoods('');
+    });
 
     function getCartParams() {
         return {
@@ -257,14 +291,21 @@
 
     $('#posBackToTables').click(function() { showStep(1); });
 
-  $(document).on('click', '.progga-pos-table-card', function() {
+    $(document).on('click', '.progga-pos-table-card', function() {
         const tId = $(this).data('table-id');
         const tNum = $(this).data('table-num');
 
         if($(this).hasClass('occupied')) {
             $.get("{{ route('pos.get_table_order', ':id') }}".replace(':id', tId), function(res) {
-                $('#ocBody').html(res);
-                bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('tableOrderOffcanvas')).show();
+                // নতুন লজিক: ফ্রন্ট ডেস্ক ক্লিক করলে কার্টে লোড হবে
+                if(res.status === 'load_cart') {
+                    window.loadHeldQrOrderToPos(res.order_data);
+                } else if(res.status === 'error') {
+                    Swal.fire('Notice', res.message, 'info');
+                } else {
+                    $('#ocBody').html(res);
+                    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('tableOrderOffcanvas')).show();
+                }
             });
         } else {
             currentOrder.table_id = tId;
@@ -414,6 +455,12 @@
     function loadCart() {
         $.get("{{ route('pos.cart.get') }}", getCartParams(), function(res) {
             $('#posCartBody').html(res);
+            // নতুন লাইন: কার্ট লোড হওয়ার পর বাটন টেক্সট আপডেট
+            if(isWaiter) {
+                $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Front Desk');
+            } else {
+                $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Kitchen');
+            }
         });
     }
 
@@ -444,8 +491,6 @@
         loadCart();
     };
 
-    // If Hold for Waiter is clicked from the main admin master page, POS is opened
-    // with held order data stored in sessionStorage. Load it directly into cart screen.
     $(document).ready(function() {
         const params = new URLSearchParams(window.location.search);
         const shouldOpenHeldQr = params.get('open_held_qr') === '1';
@@ -493,229 +538,233 @@
         });
     }
 
-$(document).on('change', 'input[name="payment_method"]', function() {
-    if($(this).val() === 'Card' || $(this).val() === 'Mobile Banking') {
-        $('#transactionDiv').slideDown('fast');
-    } else {
-        $('#transactionDiv').slideUp('fast');
-    }
-});
+    $(document).on('change', 'input[name="payment_method"]', function() {
+        if($(this).val() === 'Card' || $(this).val() === 'Mobile Banking') {
+            $('#transactionDiv').slideDown('fast');
+        } else {
+            $('#transactionDiv').slideUp('fast');
+        }
+    });
 
-$(document).on('click', '#btnSendToKitchen', function(e) {
-    e.preventDefault();
+    $(document).on('click', '#btnSendToKitchen', function(e) {
+        e.preventDefault();
 
-    if (currentOrder.order_type === 'dine_in' && !currentOrder.table_id) {
-        window.proggaToast('Please select a table first!', 'danger');
-        return;
-    }
+        if (currentOrder.order_type === 'dine_in' && !currentOrder.table_id) {
+            window.proggaToast('Please select a table first!', 'danger');
+            return;
+        }
 
-    window.Swal.fire({
-        title: 'Send to Kitchen?',
-        text: "Are you sure you want to place this order?",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#21352a',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, Send!',
-        allowOutsideClick: false
-    }).then(function(result) {
-        if (result.isConfirmed) {
-            var discType = $('#cart_discount_type').val() || 'fixed';
-            var discVal = parseFloat($('#cart_discount_value').val()) || 0;
+        // রোল অনুযায়ী টাইটেল ও টেক্সট সেট করা
+        let alertTitle = isWaiter ? 'Send to Front Desk?' : 'Send to Kitchen?';
+        let confirmBtnText = isWaiter ? 'Yes, Send to Front Desk!' : 'Yes, Send!';
 
-            var payload = {
-                order_id: currentOrder.order_id || null,
-                order_type: currentOrder.order_type,
-                table_id: currentOrder.table_id,
-                waiter_id: currentOrder.waiter_id,
-                is_walk_in: currentOrder.is_walk_in,
-                customer_id: currentOrder.customer_id,
-                customer_name: currentOrder.customer_name,
-                customer_phone: currentOrder.customer_phone,
-                order_notes: currentOrder.order_notes,
-                discount_type: discType,
-                discount_value: discVal,
-                preparation_time: $('#cart_prep_time').val() || 20,
-                _token: $('meta[name="csrf-token"]').attr('content')
-            };
+        window.Swal.fire({
+            title: alertTitle,
+            text: "Are you sure you want to place this order?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#21352a',
+            cancelButtonColor: '#d33',
+            confirmButtonText: confirmBtnText,
+            allowOutsideClick: false
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                var discType = $('#cart_discount_type').val() || 'fixed';
+                var discVal = parseFloat($('#cart_discount_value').val()) || 0;
 
-            var btn = $('#btnSendToKitchen');
-            var originalHtml = btn.html();
+                var payload = {
+                    order_id: currentOrder.order_id || null,
+                    order_type: currentOrder.order_type,
+                    table_id: currentOrder.table_id,
+                    waiter_id: currentOrder.waiter_id,
+                    is_walk_in: currentOrder.is_walk_in,
+                    customer_id: currentOrder.customer_id,
+                    customer_name: currentOrder.customer_name,
+                    customer_phone: currentOrder.customer_phone,
+                    order_notes: currentOrder.order_notes,
+                    discount_type: discType,
+                    discount_value: discVal,
+                    preparation_time: $('#cart_prep_time').val() || 20,
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                };
 
-            $.ajax({
-                url: "{{ route('pos.place_order') }}",
-                type: "POST",
-                data: payload,
-                beforeSend: function() {
-                    btn.html('<span class="spinner-border spinner-border-sm"></span>').prop('disabled', true);
-                },
-                success: function(res) {
-                    if(res.status === 'success') {
-                        window.Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: res.message,
-                            confirmButtonText: 'OK',
-                            allowOutsideClick: false
-                        }).then(function() {
-                            if (res.redirect_url) {
-                                window.location.href = res.redirect_url;
-                            } else {
-                                window.location.href = "{{ route('pos.index') }}";
-                            }
-                        });
-                    } else {
-                        window.Swal.fire('Error', res.message, 'error');
+                var btn = $('#btnSendToKitchen');
+                var originalHtml = btn.html();
+
+                $.ajax({
+                    url: "{{ route('pos.place_order') }}",
+                    type: "POST",
+                    data: payload,
+                    beforeSend: function() {
+                        btn.html('<span class="spinner-border spinner-border-sm"></span>').prop('disabled', true);
+                    },
+                    success: function(res) {
+                        if(res.status === 'success') {
+                            window.Swal.fire({
+                                icon: 'success',
+                                title: 'Success!',
+                                text: res.message,
+                                confirmButtonText: 'OK',
+                                allowOutsideClick: false
+                            }).then(function() {
+                                if (res.redirect_url) {
+                                    window.location.href = res.redirect_url;
+                                } else {
+                                    window.location.href = "{{ route('pos.index') }}";
+                                }
+                            });
+                        } else {
+                            window.Swal.fire('Error', res.message, 'error');
+                            btn.html(originalHtml).prop('disabled', false);
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error("Error Response:", xhr.responseText);
+                        window.Swal.fire('Error', 'Server failed to process order.', 'error');
                         btn.html(originalHtml).prop('disabled', false);
                     }
-                },
-                error: function(xhr) {
-                    console.error("Error Response:", xhr.responseText);
-                    window.Swal.fire('Error', 'Server failed to process order.', 'error');
+                });
+            }
+        });
+    });
+
+    window.openPaymentModal = function(data) {
+        let oc = document.getElementById('tableOrderOffcanvas');
+        if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
+
+        $('#payOrderId').val(data.order_id || '');
+        $('#payOrderType').val(data.order_type || 'takeaway');
+
+        let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
+        $('#payTableLabel').text(data.table_no || defaultLabel);
+
+        $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
+        $('#paySubtotal').text('৳' + Math.round(data.subtotal || 0));
+
+        $('#modal_discount_type').val('fixed');
+        $('#modal_discount_value').val('');
+
+        let itemsHtml = '';
+        if(data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+                itemsHtml += `
+                <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+                    <span class="text-muted">${item.name} ×${item.qty}</span>
+                    <span style="font-weight: 600;">৳${Math.round(item.total)}</span>
+                </div>`;
+            });
+        } else {
+            itemsHtml = '<div class="text-muted text-center" style="font-size:12px;">No items</div>';
+        }
+        $('#payModalItemsArea').html(itemsHtml);
+
+        calculateModalTotal();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
+    }
+
+    window.calculateModalTotal = function() {
+        let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
+        let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
+
+        let orderType = $('#payOrderType').val();
+        let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
+
+        let disc_type = $('#modal_discount_type').val();
+        let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
+
+        let service = Math.round((subtotal * service_rate) / 100);
+        let vat = Math.round(((subtotal + service) * vat_rate) / 100);
+        let discount_amount = Math.round((disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val);
+
+        let grand = Math.round((subtotal + vat + service) - discount_amount);
+
+        $('#payDiscount').text('−৳' + discount_amount);
+        $('#payVat').text('৳' + vat);
+        $('#payService').text('৳' + service);
+        $('#payTotalAmount').text('৳' + grand);
+
+        if(service === 0) {
+            $('#payServiceRow').hide();
+        } else {
+            $('#payServiceRow').show();
+        }
+
+        if ($('input[name="payment_method"]:checked').val() !== 'Split') {
+            $('#payTotalPaidAmount').val(grand);
+        }
+
+        if(typeof window.updateDueAmount === 'function') {
+            window.updateDueAmount();
+        }
+    }
+
+    $(document).on('submit', '#payForm', function(e) {
+        e.preventDefault();
+
+        let btn = $(this).find('button[type="submit"]');
+        let originalHtml = btn.html();
+        btn.html('<i class="spinner-border spinner-border-sm"></i> Processing...').prop('disabled', true);
+
+        let formData = $(this).serialize();
+
+        $.ajax({
+            url: "{{ route('pos.complete_payment') }}",
+            type: "POST",
+            data: formData + '&_token=' + $('meta[name="csrf-token"]').attr('content'),
+            success: function(res) {
+                if(res.status === 'success') {
+                    Swal.fire({ icon: 'success', title: 'Paid!', timer: 1500, showConfirmButton: false }).then(() => {
+                        window.location.href = res.redirect_url;
+                    });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
                     btn.html(originalHtml).prop('disabled', false);
                 }
-            });
-        }
-    });
-});
-
-window.openPaymentModal = function(data) {
-    let oc = document.getElementById('tableOrderOffcanvas');
-    if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
-
-    $('#payOrderId').val(data.order_id || '');
-    $('#payOrderType').val(data.order_type || 'takeaway');
-
-    let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
-    $('#payTableLabel').text(data.table_no || defaultLabel);
-
-    $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
-    $('#paySubtotal').text('৳' + Math.round(data.subtotal || 0));
-
-    $('#modal_discount_type').val('fixed');
-    $('#modal_discount_value').val('');
-
-    let itemsHtml = '';
-    if(data.items && data.items.length > 0) {
-        data.items.forEach(item => {
-            itemsHtml += `
-            <div class="progga-pay-summary-item" style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
-                <span class="text-muted">${item.name} ×${item.qty}</span>
-                <span style="font-weight: 600;">৳${Math.round(item.total)}</span>
-            </div>`;
-        });
-    } else {
-        itemsHtml = '<div class="text-muted text-center" style="font-size:12px;">No items</div>';
-    }
-    $('#payModalItemsArea').html(itemsHtml);
-
-    calculateModalTotal();
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
-}
-
-window.calculateModalTotal = function() {
-    let subtotal = parseFloat($('#paymentModal').data('subtotal')) || 0;
-    let vat_rate = parseFloat("{{ $taxSettingVatRate ?? 0 }}");
-
-    let orderType = $('#payOrderType').val();
-    let service_rate = (orderType === 'dine_in' || orderType === 'Dine-In') ? parseFloat("{{ $taxSettingServiceCharge ?? 0 }}") : 0;
-
-    let disc_type = $('#modal_discount_type').val();
-    let disc_val = parseFloat($('#modal_discount_value').val()) || 0;
-
-    let service = Math.round((subtotal * service_rate) / 100);
-    let vat = Math.round(((subtotal + service) * vat_rate) / 100);
-    let discount_amount = Math.round((disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val);
-
-    let grand = Math.round((subtotal + vat + service) - discount_amount);
-
-    $('#payDiscount').text('−৳' + discount_amount);
-    $('#payVat').text('৳' + vat);
-    $('#payService').text('৳' + service);
-    $('#payTotalAmount').text('৳' + grand);
-
-    if(service === 0) {
-        $('#payServiceRow').hide();
-    } else {
-        $('#payServiceRow').show();
-    }
-
-    if ($('input[name="payment_method"]:checked').val() !== 'Split') {
-        $('#payTotalPaidAmount').val(grand);
-    }
-
-    if(typeof window.updateDueAmount === 'function') {
-        window.updateDueAmount();
-    }
-}
-
-$(document).on('submit', '#payForm', function(e) {
-    e.preventDefault();
-
-    let btn = $(this).find('button[type="submit"]');
-    let originalHtml = btn.html();
-    btn.html('<i class="spinner-border spinner-border-sm"></i> Processing...').prop('disabled', true);
-
-    let formData = $(this).serialize();
-
-    $.ajax({
-        url: "{{ route('pos.complete_payment') }}",
-        type: "POST",
-        data: formData + '&_token=' + $('meta[name="csrf-token"]').attr('content'),
-        success: function(res) {
-            if(res.status === 'success') {
-                Swal.fire({ icon: 'success', title: 'Paid!', timer: 1500, showConfirmButton: false }).then(() => {
-                    window.location.href = res.redirect_url;
-                });
-            } else {
-                Swal.fire('Error', res.message, 'error');
+            },
+            error: function() {
+                Swal.fire('Error', 'Server error. Please try again.', 'error');
                 btn.html(originalHtml).prop('disabled', false);
             }
-        },
-        error: function() {
-            Swal.fire('Error', 'Server error. Please try again.', 'error');
-            btn.html(originalHtml).prop('disabled', false);
-        }
+        });
     });
-});
 
- $(document).on('click', '#btnContinueOrdering', function() {
-    const tId = $(this).data('table-id');
-    const orderId = $(this).data('order-id');
-    const waiterId = $(this).data('waiter-id');
-    const waiterName = $(this).data('waiter-name');
-    const customerId = $(this).data('customer-id');
-    const customerName = $(this).data('customer-name');
+    $(document).on('click', '#btnContinueOrdering', function() {
+        const tId = $(this).data('table-id');
+        const orderId = $(this).data('order-id');
+        const waiterId = $(this).data('waiter-id');
+        const waiterName = $(this).data('waiter-name');
+        const customerId = $(this).data('customer-id');
+        const customerName = $(this).data('customer-name');
 
-    const tNum = $('#ocTableNum').text();
+        const tNum = $('#ocTableNum').text();
 
-    currentOrder.table_id = tId;
-    currentOrder.table_name = tNum;
-    currentOrder.order_id = orderId;
-    currentOrder.order_type = 'dine_in';
+        currentOrder.table_id = tId;
+        currentOrder.table_name = tNum;
+        currentOrder.order_id = orderId;
+        currentOrder.order_type = 'dine_in';
 
-    currentOrder.waiter_id = waiterId ? waiterId : null;
-    currentOrder.waiter_name = waiterName ? waiterName : '';
+        currentOrder.waiter_id = waiterId ? waiterId : null;
+        currentOrder.waiter_name = waiterName ? waiterName : '';
 
-    if(customerId) {
-        currentOrder.is_walk_in = 0;
-        currentOrder.customer_id = customerId;
-        currentOrder.customer_name = customerName;
-    } else {
-        currentOrder.is_walk_in = 1;
-        currentOrder.customer_id = null;
-        currentOrder.customer_name = '';
-    }
+        if(customerId) {
+            currentOrder.is_walk_in = 0;
+            currentOrder.customer_id = customerId;
+            currentOrder.customer_name = customerName;
+        } else {
+            currentOrder.is_walk_in = 1;
+            currentOrder.customer_id = null;
+            currentOrder.customer_name = '';
+        }
 
-    var ocElement = document.getElementById('tableOrderOffcanvas');
-    if (ocElement) {
-        var ocInstance = bootstrap.Offcanvas.getInstance(ocElement);
-        if (ocInstance) ocInstance.hide();
-    }
+        var ocElement = document.getElementById('tableOrderOffcanvas');
+        if (ocElement) {
+            var ocInstance = bootstrap.Offcanvas.getInstance(ocElement);
+            if (ocInstance) ocInstance.hide();
+        }
 
-    showStep(2);
-    loadCart();
-});
+        showStep(2);
+        loadCart();
+    });
 
     $(document).on('click', '.progga-pos-filter-btn', function() {
         $('.progga-pos-filter-btn').removeClass('active');
@@ -743,19 +792,6 @@ $(document).on('submit', '#payForm', function(e) {
         $('body').removeClass('progga-pos-overflow-lock');
     });
 
-    $(document).ready(function() {
-    let hasActiveSession = "{{ $activeSession ? 'yes' : 'no' }}";
-    let requiresClose = "{{ $requirePreviousSessionClose ?? false }}";
-
-    // লজিক: যদি কোনো সেশন না থাকে, তাহলে Start Session মোডাল দেখাবে
-    if (hasActiveSession === 'no') {
-        $('#startSessionModal').modal('show');
-    }
-    // লজিক: যদি আগের দিনের সেশন ওপেন থাকে, তাহলে End Session 모ডাল দেখাবে
-    else if (requiresClose === '1') {
-        $('#previousSessionModal').modal('show');
-    }
-
     // Start Session Button Click
     $('#btnStartSession').click(function() {
         let btn = $(this);
@@ -769,89 +805,94 @@ $(document).on('submit', '#payForm', function(e) {
             }
         });
     });
-});
 
-// ম্যানুয়ালি End Session বাটন ক্লিক
-window.confirmEndSession = function(sessionId) {
-    Swal.fire({
-        title: 'End Current Shift?',
-        text: "This will calculate your sales and print the closing report.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, End Shift!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            processEndSession(sessionId);
-        }
+    window.confirmEndSession = function(sessionId) {
+        Swal.fire({
+            title: 'End Current Shift?',
+            text: "This will calculate your sales and print the closing report.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, End Shift!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                processEndSession(sessionId);
+            }
+        });
+    }
+
+    window.processEndSession = function(sessionId) {
+        Swal.fire({ title: 'Processing...', text: 'Calculating reports, please wait.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+
+        $.post("{{ route('pos.session.end') }}", {
+            _token: "{{ csrf_token() }}",
+            session_id: sessionId
+        }, function(res) {
+            if(res.status === 'success') {
+                Swal.fire({ icon: 'success', title: 'Shift Ended!', text: 'Your closing report is ready.', confirmButtonText: 'Print & Reload' }).then(() => {
+                    window.open("{{ url('/pos/session/report') }}/" + res.session_id, "_blank");
+                    location.reload();
+                });
+            }
+        });
+    }
+
+    // ১. Edit বাটনে ক্লিক করলে List হাইড হয়ে Edit ফর্ম ওপেন হবে
+    $(document).on('click', '.btnEditSession', function(e) {
+        e.preventDefault();
+
+        let sessionId = $(this).attr('data-id');
+        let sessionStatus = $(this).attr('data-status').trim(); // স্পেস রিমুভ করা হলো
+
+        $('#sessionModalTitle').html('<i class="bi bi-pencil-square me-2"></i>Edit Session #' + sessionId);
+        $('#inlineEditSessionId').val(sessionId);
+        $('#inlineEditStartTime').val($(this).attr('data-start'));
+        $('#inlineEditEndTime').val($(this).attr('data-end'));
+
+        // স্ট্যাটাস ভ্যালু সেট করে ট্রিগার করা হলো
+        $('#inlineEditStatus').val(sessionStatus).trigger('change');
+
+        $('#sessionListView').hide();
+        $('#sessionEditView').fadeIn('fast');
     });
-}
 
-// End Session প্রসেসিং লজিক
-window.processEndSession = function(sessionId) {
-    Swal.fire({ title: 'Processing...', text: 'Calculating reports, please wait.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-
-    $.post("{{ route('pos.session.end') }}", {
-        _token: "{{ csrf_token() }}",
-        session_id: sessionId
-    }, function(res) {
-        if(res.status === 'success') {
-            Swal.fire({ icon: 'success', title: 'Shift Ended!', text: 'Your closing report is ready.', confirmButtonText: 'Print & Reload' }).then(() => {
-                // ইনভয়েস প্রিন্টের জন্য নতুন উইন্ডো ওপেন করবে (রাউটটা আমরা পরে বানাবো)
-                // window.open("/pos/session/report/" + res.session_id, "_blank");
-                location.reload();
-            });
-        }
+    // ২. Back বাটনে ক্লিক করলে আবার List এ ফেরত যাবে
+    $(document).on('click', '#btnCancelEdit', function(e) {
+        e.preventDefault();
+        $('#sessionModalTitle').html('<i class="bi bi-table me-2"></i>Work Period Sessions');
+        $('#sessionEditView').hide();
+        $('#sessionListView').fadeIn('fast');
     });
-}
 
-// সেশন এডিট মোডাল ওপেন লজিক
-// সেশন এডিট মোডাল ওপেন লজিক
-$(document).on('click', '.btnEditSession', function(e) {
-    e.preventDefault();
+    // ৩. এডিট ফর্ম সাবমিট করা
+    $('#inlineEditSessionForm').on('submit', function(e) {
+        e.preventDefault();
+        let formData = $(this).serialize();
 
-    $('#editSessIdLabel').text($(this).attr('data-id'));
-    $('#editSessionId').val($(this).attr('data-id'));
-    $('#editStartTime').val($(this).attr('data-start'));
-    $('#editEndTime').val($(this).attr('data-end'));
-    $('#editStatus').val($(this).attr('data-status'));
+        let btn = $(this).find('button[type="submit"]');
+        let originalHtml = btn.html();
+        btn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm"></i> Saving...');
 
-    const editModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSessionModal'));
-    editModal.show();
-});
-
-// সেশন এডিট ফর্ম সাবমিট
-$('#editSessionForm').on('submit', function(e) {
-    e.preventDefault();
-    let formData = $(this).serialize();
-
-    $.post("{{ route('pos.session.update') }}", formData, function(res) {
-        if(res.status === 'success') {
-            $('#editSessionModal').modal('hide');
-            Swal.fire('Updated!', res.message, 'success').then(() => {
-                location.reload();
-            });
-        }
+        $.post("{{ route('pos.session.update') }}", formData, function(res) {
+            if(res.status === 'success') {
+                Swal.fire('Updated!', res.message, 'success').then(() => {
+                    location.reload();
+                });
+            }
+        }).fail(function() {
+            Swal.fire('Error', 'Something went wrong!', 'error');
+            btn.prop('disabled', false).html(originalHtml);
+        });
     });
-});
 
-// পুরনো এন্ড সেশন মেথডে প্রিন্ট লিংক আনকমেন্ট করুন
-window.processEndSession = function(sessionId) {
-    Swal.fire({ title: 'Processing...', text: 'Calculating reports, please wait.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-
-    $.post("{{ route('pos.session.end') }}", {
-        _token: "{{ csrf_token() }}",
-        session_id: sessionId
-    }, function(res) {
-        if(res.status === 'success') {
-            Swal.fire({ icon: 'success', title: 'Shift Ended!', text: 'Your closing report is ready.', confirmButtonText: 'Print & Reload' }).then(() => {
-                window.open("{{ url('/pos/session/report') }}/" + res.session_id, "_blank");
-                location.reload();
-            });
-        }
+    // ৪. মোডাল ক্লোজ হলে ভিউ রিসেট করে ডিফল্ট List এ নিয়ে আসা
+    $('#sessionHistoryModal').on('hidden.bs.modal', function () {
+        $('#sessionModalTitle').html('<i class="bi bi-table me-2"></i>Work Period Sessions');
+        $('#sessionEditView').hide();
+        $('#sessionListView').show();
     });
-}
+
 </script>
 
 @endsection
