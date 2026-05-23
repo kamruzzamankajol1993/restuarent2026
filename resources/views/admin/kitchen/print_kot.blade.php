@@ -225,6 +225,15 @@
     }
     .btn-print:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(230,126,0,.45); }
     .btn-print svg { width: 15px; height: 15px; }
+    .btn-return-pos {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 11px 28px; border: none; cursor: pointer;
+      border-radius: 24px; font-size: 13px; font-weight: 700;
+      background: #21352a; color: #fff; text-decoration: none;
+      box-shadow: 0 4px 16px rgba(33,53,42,.25);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn-return-pos:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(33,53,42,.35); color: #fff; }
 
     /* ── Print media ── */
     @media print {
@@ -313,8 +322,14 @@
     </div>
   </div>
 
-  <div class="btn-print-wrap no-print">
+  <div class="btn-print-wrap no-print" style="gap: 10px; flex-wrap: wrap;">
     <button class="btn-print" onclick="window.print()">Print KOT</button>
+
+    @if(request()->query('source') === 'pos')
+      <a href="{{ route('pos.index') }}" class="btn-return-pos">
+        Return to POS
+      </a>
+    @endif
   </div>
 </body>
 </html>

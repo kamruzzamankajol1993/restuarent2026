@@ -57,6 +57,11 @@ Route::post('/reset-password', [CustomResetPasswordController::class, 'resetPass
 
 Route::middleware(['auth'])->group(function () {
 
+// Refresh CSRF token for long-open AJAX pages like Kitchen Board
+Route::get('/refresh-csrf-token', function () {
+    return response()->json(['csrf_token' => csrf_token()]);
+})->name('csrf.refresh');
+
 
 
 // ==========================================
@@ -116,6 +121,7 @@ Route::get('reviews', [App\Http\Controllers\Admin\ReviewController::class, 'inde
     // POS: Order & Payment
     Route::post('/pos-cart-update-note', [App\Http\Controllers\Admin\PosController::class, 'updateNote'])->name('pos.cart.update_note');
     Route::post('/pos-place-order', [App\Http\Controllers\Admin\PosController::class, 'placeOrder'])->name('pos.place_order'); // Send to Kitchen
+    Route::post('/pos/hold-web-order', [App\Http\Controllers\Admin\PosController::class, 'holdWebOrder'])->name('pos.hold_web_order'); // Hold website QR order in POS cart
     Route::get('/pos/table-order/{table_id}', [App\Http\Controllers\Admin\PosController::class, 'getTableOrder'])->name('pos.get_table_order'); // Occupied Table Data
     Route::post('/pos/payment', [App\Http\Controllers\Admin\PosController::class, 'completePayment'])->name('pos.complete_payment');
 Route::get('orders/{id}/details', [App\Http\Controllers\Admin\OrderController::class, 'details'])->name('order.details');

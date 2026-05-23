@@ -55,7 +55,64 @@
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script>
-    $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
+    function getCsrfToken() {
+        return $('meta[name="csrf-token"]').attr('content');
+    }
+
+    function setCsrfToken(token) {
+        if (!token) return;
+        $('meta[name="csrf-token"]').attr('content', token);
+    }
+
+    $.ajaxSetup({
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        beforeSend: function(xhr) {
+            // Kitchen board long time open thakte pare, tai prottek AJAX request e latest CSRF token pathano hocche.
+            xhr.setRequestHeader('X-CSRF-TOKEN', getCsrfToken());
+        }
+    });
+
+    function refreshCsrfToken() {
+        return $.ajax({
+            url: "{{ route('csrf.refresh') }}",
+            type: "GET",
+            cache: false,
+            success: function(res) {
+                setCsrfToken(res.csrf_token);
+            }
+        });
+    }
+
+    function postWithCsrfRetry(ajaxOptions, retried = false) {
+        let options = $.extend(true, {}, ajaxOptions);
+        let originalError = ajaxOptions.error;
+
+        // Laravel _token input ke header er age check kore, tai retry er age _token fresh rakha hocche.
+        if (options.data && typeof options.data === 'object') {
+            options.data._token = getCsrfToken();
+        }
+
+        options.error = function(xhr) {
+            if (xhr.status === 419 && !retried) {
+                refreshCsrfToken().done(function() {
+                    postWithCsrfRetry(ajaxOptions, true);
+                }).fail(function() {
+                    if (typeof originalError === 'function') {
+                        originalError(xhr);
+                    }
+                });
+                return;
+            }
+
+            if (typeof originalError === 'function') {
+                originalError(xhr);
+            }
+        };
+
+        return $.ajax(options);
+    }
 
     let countdown = 10;
     let timerInterval;
@@ -85,12 +142,20 @@
             url: "{{ route('kitchen.get_live_orders') }}",
             type: "GET",
             success: function(res) {
+                if (res.csrfToken) {
+                    setCsrfToken(res.csrfToken);
+                }
+
                 $('#kitchenBoardArea').html(res.html);
                 $('#statPending').text(res.pendingCount);
                 $('#statCooking').text(res.cookingCount);
                 $('#statReady').text(res.readyCount);
 
                 // Restart Timer
+                refreshIcon.removeClass('spin');
+                startTimer();
+            },
+            error: function() {
                 refreshIcon.removeClass('spin');
                 startTimer();
             }
@@ -103,15 +168,32 @@
         let newStatus = $(this).data('status');
         let btn = $(this);
         let originalHtml = btn.html();
+
         btn.html('<i class="spinner-border spinner-border-sm"></i>').prop('disabled', true);
 
-        $.post("{{ route('kitchen.update_status') }}", { kot_id: kotId, status: newStatus }, function(res) {
-            if(res.status === 'success') {
-                loadLiveOrders(); // Refresh board immediately
+        postWithCsrfRetry({
+            url: "{{ route('kitchen.update_status') }}",
+            type: "POST",
+            data: {
+                kot_id: kotId,
+                status: newStatus
+            },
+            success: function(res) {
+                if (res.csrfToken) {
+                    setCsrfToken(res.csrfToken);
+                }
+
+                if(res.status === 'success') {
+                    loadLiveOrders(); // Refresh board immediately
+                } else {
+                    btn.html(originalHtml).prop('disabled', false);
+                    alert(res.message || "Status update failed!");
+                }
+            },
+            error: function() {
+                btn.html(originalHtml).prop('disabled', false);
+                alert("Something went wrong! Please try again.");
             }
-        }).fail(function(){
-            btn.html(originalHtml).prop('disabled', false);
-            alert("Something went wrong!");
         });
     });
 
@@ -157,9 +239,27 @@
         if(confirm("Are you sure this item is unavailable? It will be removed from the bill.")) {
             btn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm"></i>');
 
-            $.post("{{ route('kitchen.mark_unavailable') }}", { detail_id: detailId }, function(res) {
-                if(res.status === 'success') {
-                    loadLiveOrders(); // বোর্ড রিফ্রেশ করবে
+            postWithCsrfRetry({
+                url: "{{ route('kitchen.mark_unavailable') }}",
+                type: "POST",
+                data: {
+                    detail_id: detailId
+                },
+                success: function(res) {
+                    if (res.csrfToken) {
+                        setCsrfToken(res.csrfToken);
+                    }
+
+                    if(res.status === 'success') {
+                        loadLiveOrders(); // বোর্ড রিফ্রেশ করবে
+                    } else {
+                        btn.prop('disabled', false).html('<i class="bi bi-x"></i>');
+                        alert(res.message || "Item update failed!");
+                    }
+                },
+                error: function() {
+                    btn.prop('disabled', false).html('<i class="bi bi-x"></i>');
+                    alert("Something went wrong! Please try again.");
                 }
             });
         }

@@ -308,7 +308,7 @@ public function printSessionReport($id)
 
         DB::beginTransaction();
         try {
-            // ১. কার্টে থাকা নতুন আইটেমের টোটাল হিসাব করা
+            // ১. কার্টে থাকা আইটেমের টোটাল হিসাব করা
             $current_cart_subtotal = 0;
             foreach ($cart as $item) {
                 $current_cart_subtotal += ($item['price'] + $item['addon_total']) * $item['qty'];
@@ -317,7 +317,7 @@ public function printSessionReport($id)
             $taxSetting = DB::table('tax_settings')->first();
             $vat_rate = $taxSetting->vat_rate ?? 0;
 
-            // নতুন লজিক: শুধু Dine-In এর জন্য সার্ভিস চার্জ
+            // শুধু Dine-In এর জন্য সার্ভিস চার্জ
             $service_charge_rate = ($request->order_type == 'dine_in') ? ($taxSetting->service_charge ?? 0) : 0;
 
             $discount_value = $request->discount_value ?? 0;
@@ -328,34 +328,79 @@ public function printSessionReport($id)
             if($request->order_type == 'takeaway') $order_type_val = 'Takeaway';
             if($request->order_type == 'delivery') $order_type_val = 'Delivery';
 
-            // ২. চেক করা: এটি কি পুরনো অর্ডার? (Add More Food)
+            // ২. চেক করা: এটি কি পুরনো অর্ডার / QR Hold অর্ডার?
             if ($request->filled('order_id')) {
                 $order = Order::findOrFail($request->order_id);
+                $normalizedStatus = str_replace(['-', ' '], '_', strtolower(trim($order->status ?? '')));
+                $isQrHoldOrder = in_array($normalizedStatus, ['qr_hold', 'qrhold', 'hold']);
 
-                // পুরনো অর্ডারের সাথে নতুন কার্টের বিল যোগ করা
-                $total_subtotal = $order->subtotal + $current_cart_subtotal;
+                if ($isQrHoldOrder) {
+                    // QR Hold অর্ডার হলে আগের QR আইটেমগুলো কার্ট থেকে নতুন করে রিপ্লেস হবে
+                    $service_charge = round(($current_cart_subtotal * $service_charge_rate) / 100);
+                    $tax = round((($current_cart_subtotal + $service_charge) * $vat_rate) / 100);
+                    $discount_amount = round(($discount_type == 'percentage') ? ($current_cart_subtotal * $discount_value) / 100 : $discount_value);
+                    $grand_total = round(($current_cart_subtotal + $tax + $service_charge) - $discount_amount);
 
-                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ (রাউন্ড ফিগার সহ)
-                $service_charge = round(($total_subtotal * $service_charge_rate) / 100);
-                $tax = round((($total_subtotal + $service_charge) * $vat_rate) / 100);
-                $discount_amount = round(($discount_type == 'percentage') ? ($total_subtotal * $discount_value) / 100 : $discount_value);
-                $grand_total = round(($total_subtotal + $tax + $service_charge) - $discount_amount);
+                    $customerId = $order->customer_id;
+                    if ($request->is_walk_in == '0') {
+                        if ($request->customer_id) {
+                            $customerId = $request->customer_id;
+                        } else if ($request->customer_name) {
+                            $newCustomer = Customer::create([
+                                'name' => $request->customer_name,
+                                'phone' => $request->customer_phone
+                            ]);
+                            $customerId = $newCustomer->id;
+                        }
+                    } elseif ($request->has('is_walk_in')) {
+                        $customerId = null;
+                    }
 
-                // শুধু বিল আপডেট হবে, কাস্টমার/ওয়েটার আগেরটাই থাকবে
-                $order->update([
-                    'subtotal' => $total_subtotal,
-                    'discount_amount' => $discount_amount,
-                    'discount_type' => $discount_type,
-                    'vat_tax' => $tax,
-                    'service_charge' => $service_charge,
-                    'grand_total' => $grand_total,
-                    'preparation_time' => $request->preparation_time ?? 20, // ফিক্সড প্রিপারেশন টাইম
-                    'due' => $grand_total,
-                ]);
+                    $order->customer_id = $customerId;
+                    $order->waiter_id = $request->waiter_id ?: $order->waiter_id;
+                    $order->user_id = $order->user_id ?: (auth()->id() ?? 1);
+                    $order->order_type = $order_type_val;
+                    $order->subtotal = $current_cart_subtotal;
+                    $order->discount_amount = $discount_amount;
+                    $order->discount_type = $discount_type;
+                    $order->vat_tax = $tax;
+                    $order->service_charge = $service_charge;
+                    $order->grand_total = $grand_total;
+                    $order->due = $grand_total;
+                    $order->status = 'Pending';
+                    $order->notes = $request->order_notes ?? $order->notes;
+                    $order->preparation_time = $request->preparation_time ?? 20;
+                    $order->save();
+
+                    // QR থেকে আসা পুরনো details মুছে কার্টের আপডেটেড আইটেম দিয়ে নতুন KOT details তৈরি হবে
+                    OrderDetail::where('order_id', $order->id)->delete();
+
+                    if ($order->table_id) {
+                        Table::where('id', $order->table_id)->update(['initial_status' => 'Occupied']);
+                    }
+                } else {
+                    // পুরনো Pending অর্ডারের সাথে নতুন কার্টের বিল যোগ করা (Add More Food)
+                    $total_subtotal = $order->subtotal + $current_cart_subtotal;
+
+                    $service_charge = round(($total_subtotal * $service_charge_rate) / 100);
+                    $tax = round((($total_subtotal + $service_charge) * $vat_rate) / 100);
+                    $discount_amount = round(($discount_type == 'percentage') ? ($total_subtotal * $discount_value) / 100 : $discount_value);
+                    $grand_total = round(($total_subtotal + $tax + $service_charge) - $discount_amount);
+
+                    $order->update([
+                        'subtotal' => $total_subtotal,
+                        'discount_amount' => $discount_amount,
+                        'discount_type' => $discount_type,
+                        'vat_tax' => $tax,
+                        'service_charge' => $service_charge,
+                        'grand_total' => $grand_total,
+                        'preparation_time' => $request->preparation_time ?? 20,
+                        'due' => $grand_total,
+                    ]);
+                }
 
             } else {
                 // ৩. যদি নতুন অর্ডার হয় (ফ্রেশ কাস্টমার)
-                // নতুন লজিক: সাবটোটালের ওপর ভ্যাট এবং সার্ভিস চার্জ (রাউন্ড ফিগার সহ)
                 $service_charge = round(($current_cart_subtotal * $service_charge_rate) / 100);
                 $tax = round((($current_cart_subtotal + $service_charge) * $vat_rate) / 100);
                 $discount_amount = round(($discount_type == 'percentage') ? ($current_cart_subtotal * $discount_value) / 100 : $discount_value);
@@ -399,12 +444,12 @@ public function printSessionReport($id)
             // ৪. এই অর্ডারের আন্ডারে নতুন KOT জেনারেট করা
             $kotCount = OrderKot::where('order_id', $order->id)->count();
             $kot = OrderKot::create([
-                'order_id' => $order->id, // একই অর্ডার আইডি
-                'kot_number' => 'KOT-' . ($kotCount + 1), // আগে KOT-1 থাকলে এটা KOT-2 হবে
+                'order_id' => $order->id,
+                'kot_number' => 'KOT-' . ($kotCount + 1),
                 'kitchen_status' => 'Pending'
             ]);
 
-            // ৫. নতুন আইটেমগুলো শুধুমাত্র নতুন KOT-তে সেভ করা
+            // ৫. কার্টের আইটেমগুলো নতুন KOT-তে সেভ করা
             foreach ($cart as $item) {
                 OrderDetail::create([
                     'order_id' => $order->id,
@@ -424,7 +469,9 @@ public function printSessionReport($id)
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')'
+                'message' => 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')',
+                'kot_id' => $kot->id,
+                'redirect_url' => route('kitchen.print_kot', ['id' => $kot->id, 'source' => 'pos'])
             ]);
 
         } catch (\Exception $e) {
@@ -432,6 +479,168 @@ public function printSessionReport($id)
             return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
         }
     }
+
+    public function holdWebOrder(Request $request)
+{
+    $request->validate([
+        'id' => 'required|exists:orders,id',
+        'waiter_id' => 'required|exists:waiters,id',
+        'preparation_time' => 'nullable|integer|min:1',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $order = Order::with(['orderDetails', 'table', 'waiter', 'customer'])
+            ->lockForUpdate()
+            ->findOrFail($request->id);
+
+        $normalizedStatus = str_replace(['-', ' '], '_', strtolower(trim($order->status ?? '')));
+
+        if (!in_array($normalizedStatus, ['qr_pending', 'qr'])) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This web order is not available for hold.'
+            ]);
+        }
+
+        if (!$order->table_id) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Table information is missing for this web order.'
+            ]);
+        }
+
+        $customerType = $request->customer_type ?? 'walk_in';
+        $customerId = $order->customer_id;
+
+        if ($customerType === 'existing') {
+            if (!$request->customer_id) {
+                DB::rollBack();
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Please select an existing customer.'
+                ]);
+            }
+
+            $customerId = $request->customer_id;
+        } elseif ($customerType === 'new') {
+            if (!$request->customer_name) {
+                DB::rollBack();
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Please enter customer name.'
+                ]);
+            }
+
+            $newCustomer = Customer::create([
+                'name' => $request->customer_name,
+                'phone' => $request->customer_phone
+            ]);
+
+            $customerId = $newCustomer->id;
+        } else {
+            $customerId = null;
+        }
+
+        $cart = [];
+
+        foreach ($order->orderDetails as $detail) {
+            if (!empty($detail->is_unavailable)) {
+                continue;
+            }
+
+            $addons = json_decode($detail->addons ?? '[]', true);
+
+            if (!is_array($addons)) {
+                $addons = [];
+            }
+
+            $addonTotal = 0;
+
+            foreach ($addons as $addon) {
+                $addonTotal += (float) ($addon['price'] ?? 0);
+            }
+
+            $qty = (int) ($detail->quantity ?: 1);
+            $price = (float) ($detail->price ?? 0);
+
+            if ($price <= 0 && $qty > 0) {
+                $price = round(((float) $detail->subtotal / $qty) - $addonTotal, 2);
+            }
+
+            if ($price < 0) {
+                $price = 0;
+            }
+
+            $cart['qr_' . $detail->id] = [
+                'food_id' => $detail->product_id,
+                'name' => $detail->product_name,
+                'qty' => $qty,
+                'price' => $price,
+                'addon_total' => $addonTotal,
+                'addons' => $addons,
+                'note' => $detail->food_note ?? ''
+            ];
+        }
+
+        if (count($cart) == 0) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This web order has no available items to hold.'
+            ]);
+        }
+
+        $cartKey = 'pos_cart_table_' . $order->table_id;
+        Session::put($cartKey, $cart);
+
+        $order->customer_id = $customerId;
+        $order->waiter_id = $request->waiter_id;
+        $order->preparation_time = $request->preparation_time ?? 20;
+        $order->user_id = $order->user_id ?: (auth()->id() ?? 1);
+        $order->status = 'QR_Hold';
+        $order->save();
+
+        Table::where('id', $order->table_id)->update([
+            'initial_status' => 'Occupied'
+        ]);
+
+        $order->load(['table', 'waiter', 'customer']);
+
+        DB::commit();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Web order moved to POS cart. You can edit it before sending to kitchen.',
+            'order_id' => $order->id,
+            'table_id' => $order->table_id,
+            'table_number' => $order->table->table_number ?? ('Table ' . $order->table_id),
+            'waiter_id' => $order->waiter_id,
+            'waiter_name' => $order->waiter->name ?? '',
+            'customer_id' => $order->customer_id,
+            'customer_name' => $order->customer->name ?? 'Walk-in Customer',
+            'customer_phone' => $order->customer->phone ?? '',
+            'is_walk_in' => $order->customer_id ? 0 : 1,
+            'notes' => $order->notes ?? ''
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage()
+        ]);
+    }
+}
 
     public function completePayment(Request $request)
     {

@@ -35,7 +35,103 @@
   <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 
   <link rel="stylesheet" href="{{ asset('/') }}public/admin/assets/css/progga-style.css">
+
+  <style>
+    /* New Web Order Alert modal height/dropdown fix */
+    #newQrOrderModal {
+      z-index: 99990;
+    }
+
+    #newQrOrderModal .qr-order-modal-dialog {
+      max-width: 980px;
+      width: calc(100% - 24px);
+    }
+
+    #newQrOrderModal .modal-content {
+      max-height: 92vh;
+      overflow: visible !important;
+    }
+
+    #newQrOrderModal .qr-order-modal-body {
+      max-height: calc(92vh - 135px);
+      overflow-y: auto;
+      overflow-x: visible;
+    }
+
+    #newQrOrderModal .choices {
+      margin-bottom: 0;
+      z-index: 100000;
+    }
+
+    #newQrOrderModal .choices.is-open {
+      z-index: 100005;
+    }
+
+    #newQrOrderModal .choices__inner {
+      min-height: 42px;
+      border: 1.5px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    #newQrOrderModal .choices__list--dropdown,
+    #newQrOrderModal .choices__list[aria-expanded] {
+      z-index: 100010 !important;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    #newQrOrderModal .qr-order-items-box {
+      max-height: 310px;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 767px) {
+      #newQrOrderModal .qr-order-modal-body {
+        max-height: calc(92vh - 150px);
+      }
+
+      #newQrOrderModal .border-end {
+        border-right: 0 !important;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 16px;
+      }
+
+      #newQrOrderModal .modal-footer {
+        justify-content: stretch !important;
+      }
+
+      #newQrOrderModal .modal-footer .progga-btn {
+        flex: 1;
+      }
+    }
+  </style>
   @yield('css')
+
+<style>
+    #newQrOrderModal .modal-dialog {
+        max-width: 980px;
+    }
+    #newQrOrderModal .modal-content {
+        max-height: 92vh;
+        overflow: visible !important;
+    }
+    #newQrOrderModal .modal-body {
+        max-height: calc(92vh - 140px);
+        overflow-y: auto;
+        overflow-x: visible !important;
+    }
+    #newQrOrderModal .choices,
+    #newQrOrderModal .choices__inner,
+    #newQrOrderModal .choices__list--dropdown {
+        z-index: 100000 !important;
+    }
+    #newQrOrderModal .choices__list--dropdown {
+        max-height: 260px;
+        overflow-y: auto;
+    }
+</style>
 </head>
 <body data-page-title="@yield('title')" data-page-subtitle="Overview">
 
@@ -57,7 +153,7 @@
   <div class="progga-toast-container"></div>
 
   <div class="modal fade progga-modal" id="newQrOrderModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-lg modal-dialog-centered qr-order-modal-dialog">
     <div class="modal-content" style="border: 2px solid var(--progga-primary); border-radius: 12px; z-index: 99999;">
       <div class="modal-header" style="background: rgba(33, 53, 42, 0.05); padding: 15px 20px;">
         <h5 class="modal-title text-success" style="font-weight: 800;">
@@ -66,13 +162,13 @@
         <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('notificationSound').pause();">Mute Sound</button>
       </div>
 
-      <div class="modal-body" style="padding: 20px; background: #f8f9fa;">
+      <div class="modal-body qr-order-modal-body" style="padding: 20px; background: #f8f9fa;">
         <div class="row g-4">
             <div class="col-md-6 border-end">
     <h5 style="font-weight: 800; color: #333;">Table <span id="notifyOrderTable" class="text-primary"></span></h5>
     <p class="text-muted" style="font-size: 12px;">Order No: <strong id="notifyOrderNumber"></strong></p>
 
-    <div style="background: #fff; border: 1px solid #ddd; border-radius: 8px; max-height: 180px; overflow-y: auto;">
+    <div class="qr-order-items-box" style="background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow-y: auto;">
         <table class="table table-sm table-borderless mb-0" style="font-size: 12px;">
             <tbody id="qrOrderItemsBody"></tbody>
         </table>
@@ -84,6 +180,7 @@
         <div class="d-flex justify-content-between"><span>Service Charge:</span><span id="notifyOrderService"></span></div>
         <div class="d-flex justify-content-between mt-1 pt-1 border-top"><strong style="color:var(--progga-primary);">Total:</strong><strong id="notifyOrderAmount" class="text-danger" style="font-size: 16px;"></strong></div>
     </div>
+    <div id="notifyOrderNotes" class="mt-2 text-warning" style="font-size: 12px; font-weight: bold; display: none;"></div>
 </div>
 
             <div class="col-md-6">
@@ -135,7 +232,11 @@
         </div>
       </div>
 
-      <div class="modal-footer justify-content-end border-0" style="background: #fff; padding: 15px 20px;">
+      <div class="modal-footer justify-content-between border-0 flex-wrap gap-2" style="background: #fff; padding: 15px 20px;">
+        <button type="button" class="progga-btn progga-btn-outline px-4" id="btnHoldQrOrder" data-id="">
+          <i class="bi bi-pause-circle-fill"></i> Hold for Waiter
+        </button>
+
         <button type="button" class="progga-btn progga-btn-primary px-4" id="btnAcceptQrOrder" data-id="">
           <i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen
         </button>
@@ -188,14 +289,20 @@
     document.addEventListener("DOMContentLoaded", function () {
 
     // ১. Choices.js (যেখানে বিশেষভাবে Choices.js লাগবে সেখানে .progga-choices ক্লাস ব্যবহার করবেন)
+    window.proggaChoicesInstances = window.proggaChoicesInstances || {};
     const choicesElements = document.querySelectorAll('.progga-choices');
     choicesElements.forEach(function(element) {
-        new Choices(element, {
+        if (window.proggaChoicesInstances[element.id]) return;
+
+        window.proggaChoicesInstances[element.id] = new Choices(element, {
             searchEnabled: true,
             itemSelectText: '',
-            removeItemButton: true,
-            shouldSort: false
+            removeItemButton: false,
+            shouldSort: false,
+            position: 'bottom',
+            shouldSortItems: false
         });
+
         // Select2 যাতে এই এলিমেন্টে কাজ না করে, তা নিশ্চিত করতে
         element.setAttribute('data-no-select2', 'true');
     });
@@ -292,6 +399,22 @@ $(document).ready(function() {
         headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
     });
 
+    function getQrSelectValue(selectId) {
+        if (window.proggaChoicesInstances && window.proggaChoicesInstances[selectId]) {
+            return window.proggaChoicesInstances[selectId].getValue(true) || '';
+        }
+        return $('#' + selectId).val() || '';
+    }
+
+    function setQrSelectValue(selectId, value) {
+        if (window.proggaChoicesInstances && window.proggaChoicesInstances[selectId]) {
+            window.proggaChoicesInstances[selectId].setChoiceByValue(String(value || ''));
+        } else {
+            $('#' + selectId).val(value || '');
+        }
+        $('#' + selectId).trigger('change');
+    }
+
     // Customer Type Selection Logic
     $('#qrCustomerType').on('change', function() {
         let val = $(this).val();
@@ -345,6 +468,7 @@ $(document).ready(function() {
 
                         // ৪. এক্সেপ্ট বাটনে অর্ডার আইডি যুক্ত করা
                         $('#btnAcceptQrOrder').data('id', res.order.id);
+                        $('#btnHoldQrOrder').data('id', res.order.id);
 
                         // ৫. স্পেশাল নোটস থাকলে দেখানো
                         if(res.order.notes) {
@@ -368,8 +492,8 @@ $(document).ready(function() {
                         $('#qrOrderItemsBody').html(itemsHtml);
 
                         // ৭. ডানপাশের কাস্টমার ও ওয়েটার ফর্ম রিসেট করা
-                        $('#qrCustomerType').val('walk_in').trigger('change');
-                        $('#qrWaiterSelect').val('');
+                        setQrSelectValue('qrCustomerType', 'walk_in');
+                        setQrSelectValue('qrWaiterSelect', '');
                         $('#qrNewCustomerName').val('');
                         $('#qrNewCustomerPhone').val('');
 
@@ -393,15 +517,94 @@ $(document).ready(function() {
 
     setInterval(checkLiveNotifications, 3000);
 
+
+    // Hold Web Order Logic: keep order for waiter and open it in POS cart
+    // Hold Web Order Logic: keep order for waiter and open it in POS cart
+$('#btnHoldQrOrder').on('click', function() {
+    let orderId = $(this).data('id');
+    let waiterId = getQrSelectValue('qrWaiterSelect');
+    let prepTime = $('#qrPrepTime').val();
+    let customerType = getQrSelectValue('qrCustomerType');
+
+    let customerId = getQrSelectValue('qrExistingCustomerSelect');
+    let customerName = $('#qrNewCustomerName').val();
+    let customerPhone = $('#qrNewCustomerPhone').val();
+
+    if(!orderId) {
+        Swal.fire('Error', 'Order ID not found.', 'error');
+        return;
+    }
+
+    if(!waiterId) {
+        Swal.fire('Wait!', 'Please assign a waiter to this order.', 'warning');
+        return;
+    }
+
+    if(!prepTime || prepTime < 1) {
+        Swal.fire('Wait!', 'Please enter a valid preparation time.', 'warning');
+        return;
+    }
+
+    if(customerType === 'existing' && !customerId) {
+        Swal.fire('Wait!', 'Please select an existing customer from the list.', 'warning');
+        return;
+    }
+
+    if(customerType === 'new' && !customerName) {
+        Swal.fire('Wait!', 'Please enter the new customer name.', 'warning');
+        return;
+    }
+
+    let btn = $(this);
+    let originalHtml = btn.html();
+
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Holding...');
+
+    $.post("{{ url('/pos/hold-web-order') }}", {
+        id: orderId,
+        waiter_id: waiterId,
+        preparation_time: prepTime,
+        customer_type: customerType,
+        customer_id: customerId,
+        customer_name: customerName,
+        customer_phone: customerPhone
+    }, function(res) {
+        if(res.status === 'success') {
+            document.getElementById('notificationSound').pause();
+            $('#newQrOrderModal').modal('hide');
+
+            btn.prop('disabled', false).html(originalHtml);
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Order Held',
+                text: res.message || 'Order moved to POS cart.',
+                confirmButtonText: 'Open POS',
+                allowOutsideClick: false
+            }).then(function() {
+                sessionStorage.setItem('openHeldQrOrderInPos', JSON.stringify(res));
+                window.location.href = "{{ route('pos.index') }}?open_held_qr=1";
+            });
+        } else {
+            Swal.fire('Error', res.message || 'Failed to hold order.', 'error');
+            btn.prop('disabled', false).html(originalHtml);
+        }
+    }).fail(function(xhr) {
+        console.error("Hold Order Error:", xhr.responseText);
+        Swal.fire('Error', 'Server failed to hold this order.', 'error');
+        btn.prop('disabled', false).html(originalHtml);
+    });
+});
+
     // Accept Web Order Logic
    // Accept Web Order Logic
     $('#btnAcceptQrOrder').on('click', function() {
         let orderId = $(this).data('id');
-        let waiterId = $('#qrWaiterSelect').val();
+        let waiterId = getQrSelectValue('qrWaiterSelect');
         let prepTime = $('#qrPrepTime').val(); // প্রিপারেশন টাইম নেওয়া হলো
-        let customerType = $('#qrCustomerType').val();
+        let customerType = getQrSelectValue('qrCustomerType');
 
-        let customerId = $('#qrExistingCustomerSelect').val();
+        let customerId = getQrSelectValue('qrExistingCustomerSelect');
         let customerName = $('#qrNewCustomerName').val();
         let customerPhone = $('#qrNewCustomerPhone').val();
 
@@ -477,6 +680,8 @@ $(document).ready(function() {
 
     $('#newQrOrderModal, #waiterCallModal').on('hidden.bs.modal', function () {
         document.getElementById('notificationSound').pause();
+        $('#btnHoldQrOrder').prop('disabled', false).html('<i class="bi bi-pause-circle-fill"></i> Hold for Waiter');
+        $('#btnAcceptQrOrder').prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
         isPolling = true;
     });
 });

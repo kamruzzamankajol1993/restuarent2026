@@ -27,7 +27,47 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
   <link rel="stylesheet" href="{{ asset('/') }}public/admin/assets/css/progga-style.css">
-
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+<style>
+  /* New Web Order modal height/dropdown fix */
+  #newQrOrderModal .modal-dialog {
+    max-width: 980px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+  }
+  #newQrOrderModal .modal-content {
+    min-height: 620px;
+    max-height: calc(100vh - 24px);
+    overflow: visible !important;
+  }
+  #newQrOrderModal .modal-body {
+    min-height: 460px;
+    overflow: visible !important;
+  }
+  #newQrOrderModal .choices,
+  #newQrOrderModal .choices__inner {
+    min-height: 42px;
+  }
+  #newQrOrderModal .choices__list--dropdown,
+  #newQrOrderModal .choices__list[aria-expanded] {
+    z-index: 100002 !important;
+  }
+  @media (max-width: 767.98px) {
+    #newQrOrderModal .modal-dialog {
+      max-width: calc(100% - 16px);
+      margin: 8px auto;
+    }
+    #newQrOrderModal .modal-content {
+      min-height: auto;
+      max-height: calc(100vh - 16px);
+    }
+    #newQrOrderModal .modal-body {
+      min-height: auto;
+      max-height: calc(100vh - 150px);
+      overflow-y: auto !important;
+    }
+  }
+</style>
     @yield('css')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 </head>
@@ -37,7 +77,7 @@
     @yield('body')
 
 <div class="modal fade progga-modal" id="newQrOrderModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content" style="border: 2px solid var(--progga-primary); border-radius: 12px; z-index: 99999;">
       <div class="modal-header" style="background: rgba(33, 53, 42, 0.05); padding: 15px 20px;">
         <h5 class="modal-title text-success" style="font-weight: 800;">
@@ -76,7 +116,7 @@
                 <form id="qrAcceptForm">
                     <div class="pos-modal-section mb-3">
                         <label class="pos-modal-label" style="font-weight: 700; font-size: 13px;">Assign Waiter <span class="text-danger">*</span></label>
-                        <select id="qrWaiterSelect" class="form-control" style="border: 1.5px solid #ccc; border-radius: 6px; font-size: 14px;" required>
+                        <select id="qrWaiterSelect" class="progga-choices" style="border: 1.5px solid #ccc; border-radius: 6px; font-size: 14px;" required>
                             <option value="">— Select Waiter —</option>
                             @foreach($waiters as $waiter)
                                 <option value="{{ $waiter->id }}">{{ $waiter->name }}</option>
@@ -86,7 +126,7 @@
 
                     <div class="pos-modal-section mb-2">
                         <label class="pos-modal-label" style="font-weight: 700; font-size: 13px;">Customer Type</label>
-                        <select id="qrCustomerType" class="form-control" style="border: 1.5px solid #ccc; border-radius: 6px; font-size: 14px; background: #fff;">
+                        <select id="qrCustomerType" class="progga-choices" style="border: 1.5px solid #ccc; border-radius: 6px; font-size: 14px; background: #fff;">
                             <option value="walk_in">Walk-in Customer (No Details Needed)</option>
                             <option value="existing">Search Existing Customer</option>
                             <option value="new">Add New Customer</option>
@@ -94,7 +134,7 @@
                     </div>
 
                     <div id="qrExistingCustomerDiv" style="display: none; margin-bottom: 10px;">
-                        <select id="qrExistingCustomerSelect" class="form-control" style="width: 100%;">
+                        <select id="qrExistingCustomerSelect" class="progga-choices" style="width: 100%;">
                             <option value="">— Select Customer —</option>
                             @foreach($customers as $customer)
                                 <option value="{{ $customer->id }}">{{ $customer->name }} ({{ $customer->phone }})</option>
@@ -117,7 +157,10 @@
         </div>
       </div>
 
-      <div class="modal-footer justify-content-end border-0" style="background: #fff; padding: 15px 20px;">
+      <div class="modal-footer justify-content-end border-0" style="background: #fff; padding: 15px 20px; gap: 10px;">
+        <button type="button" class="progga-btn progga-btn-secondary px-4" id="btnHoldQrOrder" data-id="">
+          <i class="bi bi-pause-circle-fill"></i> Hold for Waiter
+        </button>
         <button type="button" class="progga-btn progga-btn-primary px-4" id="btnAcceptQrOrder" data-id="">
           <i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen
         </button>
@@ -154,9 +197,27 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
   <script src="{{ asset('/') }}public/admin/assets/js/progga-app.js"></script>
   <script src="{{ asset('/') }}public/admin/assets/js/progga-pos.js"></script>
 <script>
+
+     document.addEventListener("DOMContentLoaded", function () {
+
+    // ১. Choices.js (যেখানে বিশেষভাবে Choices.js লাগবে সেখানে .progga-choices ক্লাস ব্যবহার করবেন)
+    const choicesElements = document.querySelectorAll('.progga-choices');
+    choicesElements.forEach(function(element) {
+        new Choices(element, {
+            searchEnabled: true,
+            itemSelectText: '',
+            removeItemButton: true,
+            shouldSort: false
+        });
+        // Select2 যাতে এই এলিমেন্টে কাজ না করে, তা নিশ্চিত করতে
+        element.setAttribute('data-no-select2', 'true');
+    });
+});
+
 $(document).ready(function() {
     let isPolling = true;
 
@@ -203,6 +264,7 @@ $(document).ready(function() {
                         $('#notifyOrderNumber').text(res.order.order_number);
                         $('#notifyOrderAmount').text('৳' + Math.round(res.order.grand_total));
                         $('#btnAcceptQrOrder').data('id', res.order.id);
+                        $('#btnHoldQrOrder').data('id', res.order.id);
 
                         if(res.order.notes) {
                             $('#notifyOrderNotes').html('<i class="bi bi-info-circle-fill"></i> Note: ' + res.order.notes).show();
@@ -225,6 +287,8 @@ $(document).ready(function() {
 
                         $('#qrCustomerType').val('walk_in').trigger('change');
                         $('#qrWaiterSelect').val('');
+                        $('#btnHoldQrOrder').prop('disabled', false).html('<i class="bi bi-pause-circle-fill"></i> Hold for Waiter');
+                        $('#btnAcceptQrOrder').prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
                         $('#qrNewCustomerName').val('');
                         $('#qrNewCustomerPhone').val('');
 
@@ -295,6 +359,79 @@ $(document).ready(function() {
                 Swal.fire('Error', res.message, 'error');
                 btn.prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
             }
+        });
+    });
+
+    $('#btnHoldQrOrder').on('click', function() {
+        let orderId = $(this).data('id');
+        let waiterId = $('#qrWaiterSelect').val();
+        let customerType = $('#qrCustomerType').val();
+
+        let customerId = $('#qrExistingCustomerSelect').val();
+        let customerName = $('#qrNewCustomerName').val();
+        let customerPhone = $('#qrNewCustomerPhone').val();
+
+        if(!orderId) {
+            Swal.fire('Error', 'Order ID missing.', 'error');
+            return;
+        }
+
+        if(customerType === 'existing' && !customerId) {
+            Swal.fire('Wait!', 'Please select an existing customer from the list.', 'warning');
+            return;
+        }
+
+        if(customerType === 'new' && !customerName) {
+            Swal.fire('Wait!', 'Please enter the new customer name.', 'warning');
+            return;
+        }
+
+        let btn = $(this);
+        let acceptBtn = $('#btnAcceptQrOrder');
+        let originalHtml = btn.html();
+
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Holding...');
+        acceptBtn.prop('disabled', true);
+
+        $.post("{{ route('pos.hold_web_order') }}", {
+            id: orderId,
+            waiter_id: waiterId,
+            customer_type: customerType,
+            customer_id: customerId,
+            customer_name: customerName,
+            customer_phone: customerPhone
+        }, function(res) {
+            if(res.status === 'success') {
+                document.getElementById('notificationSound').pause();
+                $('#newQrOrderModal').modal('hide');
+
+                btn.prop('disabled', false).html(originalHtml);
+                acceptBtn.prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Order moved to POS cart!',
+                    showConfirmButton: false,
+                    timer: 1500
+                }).then(() => {
+                    if (typeof window.loadHeldQrOrderToPos === 'function') {
+                        window.loadHeldQrOrderToPos(res);
+                    } else {
+                        window.location.href = "{{ route('pos.index') }}";
+                    }
+                });
+            } else {
+                Swal.fire('Error', res.message || 'Unable to hold this order.', 'error');
+                btn.prop('disabled', false).html(originalHtml);
+                acceptBtn.prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
+            }
+        }).fail(function(xhr) {
+            console.error('Hold QR order failed:', xhr.responseText);
+            Swal.fire('Error', 'Server failed to hold this order.', 'error');
+            btn.prop('disabled', false).html(originalHtml);
+            acceptBtn.prop('disabled', false).html('<i class="bi bi-check-circle-fill"></i> Accept & Send to Kitchen');
         });
     });
 

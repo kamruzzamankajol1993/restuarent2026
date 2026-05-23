@@ -2,7 +2,12 @@
     $minutesWaiting = \Carbon\Carbon::parse($kot->created_at)->diffInMinutes(now());
     $isUrgent = $minutesWaiting > 15 ? 'urgent' : '';
 
-    $prepTime = $kot->order?->preparation_time ?? 20;
+    $prepTime = (int) ($kot->order?->preparation_time ?? 20);
+
+    if ($prepTime < 1) {
+        $prepTime = 20;
+    }
+
     $isCooking = $kot->kitchen_status === 'Cooking';
     $remainingSeconds = 0;
 

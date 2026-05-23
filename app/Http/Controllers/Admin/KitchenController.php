@@ -50,7 +50,8 @@ class KitchenController extends Controller
             'pendingCount' => $pendingCount,
             'cookingCount' => $cookingCount,
             'readyCount' => $readyCount,
-            'summaryCount' => $totalSummaryItems
+            'summaryCount' => $totalSummaryItems,
+            'csrfToken' => csrf_token()
         ]);
     }
 
@@ -61,7 +62,10 @@ class KitchenController extends Controller
         $kot->kitchen_status = $request->status; // Pending -> Cooking -> Ready -> Delivered
         $kot->save();
 
-        return response()->json(['status' => 'success']);
+        return response()->json([
+            'status' => 'success',
+            'csrfToken' => csrf_token()
+        ]);
     }
 
     // KOT Print View
@@ -106,6 +110,9 @@ class KitchenController extends Controller
             'due' => $grand_total - $order->total_paid_amount
         ]);
 
-        return response()->json(['status' => 'success']);
+        return response()->json([
+            'status' => 'success',
+            'csrfToken' => csrf_token()
+        ]);
     }
 }

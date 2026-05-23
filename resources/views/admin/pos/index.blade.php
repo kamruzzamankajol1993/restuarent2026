@@ -123,9 +123,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($sessions as $sess)
+                            @forelse($sessions as $key => $sess)
                                 <tr>
-                                    <td><strong>#{{ $sess->id }}</strong></td>
+                                    <td><strong>#{{ $key+1 }}</strong></td>
                                     <td>{{ $sess->user->name ?? 'N/A' }}</td>
                                     <td><span class="badge bg-secondary">{{ $sess->weekday }}</span></td>
                                     <td>{{ $sess->start_time->format('d M y - h:i A') }}</td>
@@ -139,9 +139,14 @@
                                     </td>
                                     <td>
                                         <div class="d-flex gap-1 justify-content-center">
-                                            <button type="button" class="btn btn-sm btn-primary" onclick="editSession({{ json_encode($sess) }})">
-                                                <i class="bi bi-pencil-square"></i> Edit
-                                            </button>
+                                           <button type="button"
+        class="btn btn-sm btn-primary btnEditSession"
+        data-id="{{ $sess->id }}"
+        data-start="{{ $sess->start_time ? $sess->start_time->format('Y-m-d\TH:i') : '' }}"
+        data-end="{{ $sess->end_time ? $sess->end_time->format('Y-m-d\TH:i') : '' }}"
+        data-status="{{ $sess->status }}">
+    <i class="bi bi-pencil-square"></i> Edit
+</button>
                                             @if($sess->status == 'Closed')
                                                 <a href="{{ route('pos.session.report', $sess->id) }}" target="_blank" class="btn btn-sm btn-warning fw-bold">
                                                     <i class="bi bi-printer"></i> Print
@@ -265,6 +270,7 @@
             currentOrder.table_id = tId;
             currentOrder.table_name = tNum;
             currentOrder.order_type = 'dine_in';
+            currentOrder.order_id = null;
 
             $('#posTypeDineIn, #labelDineIn').show();
             $('#posTypeDineIn').prop('checked', true);
@@ -278,6 +284,7 @@
         currentOrder.table_id = null;
         currentOrder.table_name = 'Takeaway';
         currentOrder.order_type = 'takeaway';
+        currentOrder.order_id = null;
 
         $('#posTypeDineIn, #labelDineIn').hide();
         $('#posTypeTakeaway').prop('checked', true);
@@ -293,6 +300,7 @@
             currentOrder.order_type = type;
             currentOrder.table_id = null;
             currentOrder.table_name = type === 'takeaway' ? 'Takeaway' : 'Delivery';
+            currentOrder.order_id = null;
         } else {
             if(currentOrder.table_id != null) {
                 $('#modalSelectedTableNum').text(currentOrder.table_name);
@@ -409,6 +417,58 @@
         });
     }
 
+    window.loadHeldQrOrderToPos = function(data) {
+        currentOrder.order_id = data.order_id || null;
+        currentOrder.order_type = 'dine_in';
+        currentOrder.table_id = data.table_id || null;
+        currentOrder.table_name = data.table_number || ('Table ' + (data.table_id || ''));
+        currentOrder.waiter_id = data.waiter_id || null;
+        currentOrder.waiter_name = data.waiter_name || 'Unassigned';
+        currentOrder.customer_id = data.customer_id || null;
+        currentOrder.customer_name = data.customer_name || 'Walk-in Customer';
+        currentOrder.customer_phone = data.customer_phone || '';
+        currentOrder.is_walk_in = parseInt(typeof data.is_walk_in !== 'undefined' ? data.is_walk_in : (data.customer_id ? 0 : 1));
+        currentOrder.order_notes = data.notes || '';
+
+        let tableCard = $('.progga-pos-table-card[data-table-id="' + currentOrder.table_id + '"]');
+        if(tableCard.length) {
+            tableCard.removeClass('available reserved').addClass('occupied');
+            tableCard.attr('data-status', 'occupied');
+            tableCard.find('.progga-badge')
+                .removeClass('progga-status-available progga-status-reserved')
+                .addClass('progga-status-occupied')
+                .text('Occupied');
+        }
+
+        showStep(2);
+        loadCart();
+    };
+
+    // If Hold for Waiter is clicked from the main admin master page, POS is opened
+    // with held order data stored in sessionStorage. Load it directly into cart screen.
+    $(document).ready(function() {
+        const params = new URLSearchParams(window.location.search);
+        const shouldOpenHeldQr = params.get('open_held_qr') === '1';
+        const storedHeldQr = sessionStorage.getItem('openHeldQrOrderInPos');
+
+        if (shouldOpenHeldQr && storedHeldQr) {
+            try {
+                const heldOrderData = JSON.parse(storedHeldQr);
+                sessionStorage.removeItem('openHeldQrOrderInPos');
+
+                if (typeof window.loadHeldQrOrderToPos === 'function') {
+                    setTimeout(function() {
+                        window.loadHeldQrOrderToPos(heldOrderData);
+                    }, 300);
+                }
+            } catch (e) {
+                console.error('Failed to open held QR order in POS cart:', e);
+                sessionStorage.removeItem('openHeldQrOrderInPos');
+            }
+        }
+    });
+
+
     window.removeCartItem = function(cartId) {
         let payload = getCartParams();
         payload.cart_id = cartId;
@@ -491,8 +551,18 @@ $(document).on('click', '#btnSendToKitchen', function(e) {
                 },
                 success: function(res) {
                     if(res.status === 'success') {
-                        window.Swal.fire('Success!', res.message, 'success').then(function() {
-                            window.location.reload();
+                        window.Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: res.message,
+                            confirmButtonText: 'OK',
+                            allowOutsideClick: false
+                        }).then(function() {
+                            if (res.redirect_url) {
+                                window.location.href = res.redirect_url;
+                            } else {
+                                window.location.href = "{{ route('pos.index') }}";
+                            }
                         });
                     } else {
                         window.Swal.fire('Error', res.message, 'error');
@@ -737,26 +807,19 @@ window.processEndSession = function(sessionId) {
 }
 
 // সেশন এডিট মোডাল ওপেন লজিক
-window.editSession = function(sessionData) {
-    $('#editSessIdLabel').text(sessionData.id);
-    $('#editSessionId').val(sessionData.id);
+// সেশন এডিট মোডাল ওপেন লজিক
+$(document).on('click', '.btnEditSession', function(e) {
+    e.preventDefault();
 
-    // ডেইট ফরম্যাট ম্যাচিং (YYYY-MM-DDTHH:MM)
-    let startStr = new Date(sessionData.start_time).toISOString().slice(0, 16);
-    $('#editStartTime').val(startStr);
+    $('#editSessIdLabel').text($(this).attr('data-id'));
+    $('#editSessionId').val($(this).attr('data-id'));
+    $('#editStartTime').val($(this).attr('data-start'));
+    $('#editEndTime').val($(this).attr('data-end'));
+    $('#editStatus').val($(this).attr('data-status'));
 
-    if(sessionData.end_time) {
-        let endStr = new Date(sessionData.end_time).toISOString().slice(0, 16);
-        $('#editEndTime').val(endStr);
-    } else {
-        $('#editEndTime').val('');
-    }
-
-    $('#editStatus').val(sessionData.status);
-
-    $('#sessionHistoryModal').modal('hide');
-    $('#editSessionModal').modal('show');
-}
+    const editModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSessionModal'));
+    editModal.show();
+});
 
 // সেশন এডিট ফর্ম সাবমিট
 $('#editSessionForm').on('submit', function(e) {
