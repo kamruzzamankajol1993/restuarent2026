@@ -1,5 +1,5 @@
 @extends('admin.master.master')
-@section('title', 'Roles — ' . ($restaurantSettingName ?? 'Progga RMS'))
+@section('title', 'Roles — ' . ($restaurantSettingName ?? 'TableTrack RMS'))
 
 @section('body')
 <main class="progga-content">

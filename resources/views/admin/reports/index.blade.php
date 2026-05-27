@@ -1,5 +1,5 @@
 @extends('admin.master.master')
-@section('title', 'Reports & Analytics — Progga RMS')
+@section('title', 'Reports & Analytics — TableTrack RMS')
 
 @section('css')
 <style>

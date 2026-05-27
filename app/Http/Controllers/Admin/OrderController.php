@@ -7,6 +7,10 @@ use Illuminate\Http\Request;
 use App\Models\Order;
 use Carbon\Carbon;
 use Mpdf\Mpdf;
+use Illuminate\Support\Facades\DB;
+use App\Models\OrderDetail;
+use App\Models\OrderKot;
+use App\Models\Table;
 class OrderController extends Controller
 {
     public function index(Request $request)
@@ -217,4 +221,49 @@ class OrderController extends Controller
         // ফুল-পেজ ব্লেড ফাইল রিটার্ন করা হচ্ছে
         return view('admin.order.show', compact('order'));
     }
+
+    public function destroy($id)
+{
+    if (!auth()->user()->can('order-delete')) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'You do not have permission to delete this order.'
+        ], 403);
+    }
+
+    \Illuminate\Support\Facades\DB::beginTransaction();
+
+    try {
+        $order = Order::with(['orderDetails', 'kots'])->findOrFail($id);
+
+        // যদি dine-in order হয়, table available করে দেওয়া
+        if ($order->table_id) {
+            \App\Models\Table::where('id', $order->table_id)->update([
+                'initial_status' => 'Available'
+            ]);
+        }
+
+        // Related data delete
+        \App\Models\OrderDetail::where('order_id', $order->id)->delete();
+        \App\Models\OrderKot::where('order_id', $order->id)->delete();
+
+        // Main order delete
+        $order->delete();
+
+        \Illuminate\Support\Facades\DB::commit();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Order deleted successfully!'
+        ]);
+
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\DB::rollBack();
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Order delete failed! ' . $e->getMessage()
+        ], 500);
+    }
+}
 }

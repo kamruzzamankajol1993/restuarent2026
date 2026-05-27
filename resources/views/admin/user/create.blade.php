@@ -1,5 +1,5 @@
 @extends('admin.master.master')
-@section('title', 'Create User — Progga RMS')
+@section('title', 'Create User — TableTrack RMS')
 
 @section('body')
 <main class="progga-content">

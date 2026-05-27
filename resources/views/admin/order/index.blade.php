@@ -1,5 +1,5 @@
 @extends('admin.master.master')
-@section('title', 'Order List — Progga RMS')
+@section('title', 'Order List — TableTrack RMS')
 
 @section('css')
 <style>
@@ -191,6 +191,61 @@
             $('#modalContentArea').html('<div class="p-4 text-danger text-center">Failed to load data.</div>');
         });
     };
+
+    window.deleteOrder = function(id) {
+    Swal.fire({
+        title: 'Delete this order?',
+        text: 'This action cannot be undone!',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel',
+        allowOutsideClick: false
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: "{{ url('orders') }}/" + id,
+                type: "DELETE",
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                },
+                beforeSend: function() {
+                    $('#order_data_container').css('opacity', '0.5');
+                },
+                success: function(res) {
+                    if (res.status === 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deleted!',
+                            text: res.message,
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+
+                        fetchOrders();
+                    } else {
+                        Swal.fire('Error', res.message || 'Delete failed.', 'error');
+                        $('#order_data_container').css('opacity', '1');
+                    }
+                },
+                error: function(xhr) {
+                    let message = 'Server failed to delete order.';
+
+                    if (xhr.status === 403) {
+                        message = 'You do not have permission to delete this order.';
+                    } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+
+                    Swal.fire('Error', message, 'error');
+                    $('#order_data_container').css('opacity', '1');
+                }
+            });
+        }
+    });
+};
 
    function exportOrderPDF() {
         let search = $('#searchOrder').val() || '';

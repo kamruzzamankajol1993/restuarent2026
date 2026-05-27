@@ -1,5 +1,5 @@
 @extends('admin.pos.master')
-@section('title', 'POS System — Progga RMS')
+@section('title', 'POS System — TableTrack RMS')
 
 @section('css')
 <style>
@@ -15,6 +15,50 @@
     .pos-type-wrap:has(#posTypeDelivery:checked) label[for="posTypeDelivery"] {
       background: var(--progga-primary) !important;
       color: var(--progga-secondary) !important;
+    }
+
+
+    .progga-session-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid rgba(25, 135, 84, 0.25);
+      background: rgba(25, 135, 84, 0.10);
+      color: #198754;
+      white-space: nowrap;
+    }
+
+    .progga-session-status.no-session {
+      border-color: rgba(220, 53, 69, 0.25);
+      background: rgba(220, 53, 69, 0.10);
+      color: #dc3545;
+    }
+
+    .progga-session-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #198754;
+      box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.14);
+    }
+
+    .progga-session-status.no-session .progga-session-dot {
+      background: #dc3545;
+      box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.14);
+    }
+
+    @media (max-width: 767.98px) {
+      .progga-session-status {
+        padding: 6px 9px;
+        font-size: 11px;
+      }
+      .progga-session-start-label {
+        display: none;
+      }
     }
 </style>
 @endsection
@@ -40,13 +84,18 @@
       <div class="d-flex align-items-center" style="gap: 15px;">
         @if(!auth()->user()->hasRole('waiter'))
             @if($activeSession)
-                <button type="button" class="progga-btn progga-btn-danger progga-btn-sm" onclick="confirmEndSession({{ $activeSession->id }})" title="End Shift & Print Report">
-                    <i class="bi bi-stop-circle"></i> End Shift
-                </button>
+                <div class="progga-session-status" title="Current POS session is running">
+                    <span class="progga-session-dot"></span>
+                    <span>Session Running</span>
+                    <span class="progga-session-start-label">• Started {{ $activeSession->start_time->format('h:i A') }}</span>
+                    <span>• <span id="posSessionTimer" data-start="{{ $activeSession->start_time->format('Y-m-d H:i:s') }}">00h 00m</span></span>
+                </div>
+            @else
+                <div class="progga-session-status no-session" title="No active POS session found">
+                    <span class="progga-session-dot"></span>
+                    <span>No Active Session</span>
+                </div>
             @endif
-            <a href="{{ url('/clear') }}" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" title="Clear System Cache">
-                <i class="bi bi-arrow-clockwise"></i> Clear Cache
-            </a>
             <button type="button" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" data-bs-toggle="modal" data-bs-target="#sessionHistoryModal">
                 <i class="bi bi-history"></i> Session History
             </button>
@@ -72,41 +121,6 @@
 @include('admin.pos.modals.addon')
 @include('admin.pos.modals.payment')
 @include('admin.pos.partials.offcanvas_wrapper')
-
-<div class="modal fade progga-modal" id="startSessionModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-play-circle-fill me-2"></i>Start Work Period</h5>
-            </div>
-            <div class="modal-body text-center p-4">
-                <p class="text-muted mb-4">You have no active session. Start a new work period to process orders.</p>
-                <button type="button" class="btn btn-success w-100 fw-bold py-2" id="btnStartSession">
-                    <i class="bi bi-check-circle"></i> Start Shift Now
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-@if(isset($requirePreviousSessionClose) && $requirePreviousSessionClose)
-<div class="modal fade progga-modal" id="previousSessionModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; border: 2px solid #dc3545;">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Pending Session Alert</h5>
-            </div>
-            <div class="modal-body text-center p-4">
-                <h5 class="text-danger fw-bold">You have an unfinished session from yesterday!</h5>
-                <p class="text-muted mt-2 mb-4">Started on: <strong>{{ $activeSession->start_time->format('l, M d, Y h:i A') }}</strong><br>Please end the previous session to start working today.</p>
-                <button type="button" class="btn btn-danger w-100 fw-bold py-2" onclick="processEndSession({{ $activeSession->id }})">
-                    <i class="bi bi-stop-circle-fill"></i> End Previous Session & Print Report
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-@endif
 
 <div class="modal fade progga-modal" id="sessionHistoryModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-dialog-centered">
@@ -223,6 +237,13 @@
 @section('script')
 
 <script>
+(function bootPosScriptWhenJqueryReady() {
+    if (!window.jQuery) {
+        setTimeout(bootPosScriptWhenJqueryReady, 50);
+        return;
+    }
+
+
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
 
     let currentOrder = {
@@ -233,19 +254,33 @@
     let currentCat = '';
     let isWaiter = @json(auth()->user()->hasRole('waiter'));
 
+    function updatePosSessionTimer() {
+        var timer = document.getElementById('posSessionTimer');
+        if (!timer) return;
+
+        var startText = timer.getAttribute('data-start');
+        if (!startText) return;
+
+        var startTime = new Date(String(startText).replace(' ', 'T'));
+        var now = new Date();
+        var diffMs = now - startTime;
+        if (diffMs < 0) diffMs = 0;
+
+        var totalMinutes = Math.floor(diffMs / 60000);
+        var hours = Math.floor(totalMinutes / 60);
+        var minutes = totalMinutes % 60;
+
+        timer.textContent = String(hours).padStart(2, '0') + 'h ' + String(minutes).padStart(2, '0') + 'm';
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updatePosSessionTimer);
+    } else {
+        updatePosSessionTimer();
+    }
+    setInterval(updatePosSessionTimer, 60000);
+
     $(document).ready(function() {
-        let hasActiveSession = "{{ isset($activeSession) && $activeSession ? 'yes' : 'no' }}";
-        let requiresClose = "{{ $requirePreviousSessionClose ?? false }}";
-
-        // ওয়েটার না হলে তবেই সেশন মোডাল দেখাবে
-        if (!isWaiter) {
-            if (hasActiveSession === 'no') {
-                $('#startSessionModal').modal('show');
-            } else if (requiresClose === '1') {
-                $('#previousSessionModal').modal('show');
-            }
-        }
-
         // বাটন টেক্সট পরিবর্তন
         if(isWaiter) {
             $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Front Desk');
@@ -792,52 +827,6 @@
         $('body').removeClass('progga-pos-overflow-lock');
     });
 
-    // Start Session Button Click
-    $('#btnStartSession').click(function() {
-        let btn = $(this);
-        btn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm"></i> Starting...');
-
-        $.post("{{ route('pos.session.start') }}", { _token: "{{ csrf_token() }}" }, function(res) {
-            if(res.status === 'success') {
-                Swal.fire({ icon: 'success', title: 'Shift Started!', timer: 1500, showConfirmButton: false }).then(() => {
-                    location.reload();
-                });
-            }
-        });
-    });
-
-    window.confirmEndSession = function(sessionId) {
-        Swal.fire({
-            title: 'End Current Shift?',
-            text: "This will calculate your sales and print the closing report.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, End Shift!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                processEndSession(sessionId);
-            }
-        });
-    }
-
-    window.processEndSession = function(sessionId) {
-        Swal.fire({ title: 'Processing...', text: 'Calculating reports, please wait.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-
-        $.post("{{ route('pos.session.end') }}", {
-            _token: "{{ csrf_token() }}",
-            session_id: sessionId
-        }, function(res) {
-            if(res.status === 'success') {
-                Swal.fire({ icon: 'success', title: 'Shift Ended!', text: 'Your closing report is ready.', confirmButtonText: 'Print & Reload' }).then(() => {
-                    window.open("{{ url('/pos/session/report') }}/" + res.session_id, "_blank");
-                    location.reload();
-                });
-            }
-        });
-    }
-
     // ১. Edit বাটনে ক্লিক করলে List হাইড হয়ে Edit ফর্ম ওপেন হবে
     $(document).on('click', '.btnEditSession', function(e) {
         e.preventDefault();
@@ -893,6 +882,8 @@
         $('#sessionListView').show();
     });
 
+
+})();
 </script>
 
 @endsection

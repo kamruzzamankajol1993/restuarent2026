@@ -140,72 +140,109 @@ public function printSessionReport($id)
             'status' => 'required'
         ]);
 
-        $session = PosSession::findOrFail($request->session_id);
+        DB::beginTransaction();
 
-        $startTime = Carbon::parse($request->start_time);
-        $endTime = $request->end_time ? Carbon::parse($request->end_time) : null;
-        $duration = null;
+        try {
+            $session = PosSession::lockForUpdate()->findOrFail($request->session_id);
+            $previousStatus = $session->status;
+            $sessionUserId = $session->user_id;
 
-        // ডিফল্ট ভ্যালু সেট করা হচ্ছে
-        $sales_total = 0;
-        $service_charge = 0;
-        $vat_total = 0;
-        $grand_total = 0;
-        $incomes = ['Cash' => 0, 'Card' => 0, 'MFC' => 0];
+            $startTime = Carbon::parse($request->start_time);
+            $endTime = $request->end_time ? Carbon::parse($request->end_time) : null;
+            $duration = null;
 
-        // যদি সেশন Closed থাকে অথবা এন্ড টাইম দেওয়া হয়, তবে নতুন সময় অনুযায়ী হিসাব রি-ক্যালকুলেট হবে
-        if ($endTime && $request->status == 'Closed') {
-            // ডিউরেশন ক্যালকুলেশন
-            $durationDiff = $endTime->diffAsCarbonInterval($startTime);
-            $duration = $durationDiff->cascade()->forHumans(['short' => true]);
+            // ডিফল্ট ভ্যালু সেট করা হচ্ছে
+            $sales_total = 0;
+            $service_charge = 0;
+            $vat_total = 0;
+            $grand_total = 0;
+            $incomes = ['Cash' => 0, 'Card' => 0, 'MFC' => 0];
 
-            // নতুন এডিট করা সময় সীমার ভেতরের Completed অর্ডারগুলো নেওয়া হচ্ছে
-            $orders = Order::where('created_at', '>=', $startTime)
-                           ->where('created_at', '<=', $endTime)
-                           ->where('status', 'Completed')
-                           ->get();
+            // যদি সেশন Closed থাকে এবং এন্ড টাইম দেওয়া হয়, তবে নতুন সময় অনুযায়ী হিসাব রি-ক্যালকুলেট হবে
+            if ($endTime && $request->status == 'Closed') {
+                // ডিউরেশন ক্যালকুলেশন
+                $durationDiff = $endTime->diffAsCarbonInterval($startTime);
+                $duration = $durationDiff->cascade()->forHumans(['short' => true]);
 
-            $sales_total = $orders->sum('subtotal');
-            $service_charge = $orders->sum('service_charge');
-            $vat_total = $orders->sum('vat_tax');
-            $grand_total = $orders->sum('grand_total');
+                // নতুন এডিট করা সময় সীমার ভেতরের Completed অর্ডারগুলো নেওয়া হচ্ছে
+                $orders = Order::where('created_at', '>=', $startTime)
+                               ->where('created_at', '<=', $endTime)
+                               ->where('status', 'Completed')
+                               ->get();
 
-            // নতুন করে পেমেন্ট মেথড সামারি তৈরি করা হচ্ছে
-            $cash = 0; $card = 0; $mfc = 0;
-            foreach($orders as $order) {
-                if ($order->payment_type == 'Split') {
-                    $cash += $order->paid_in_cash;
-                    $card += $order->paid_in_card;
-                    $mfc += $order->paid_in_mfc;
-                } else {
-                    if ($order->payment_type == 'Cash') $cash += $order->total_paid_amount;
-                    if ($order->payment_type == 'Card') $card += $order->total_paid_amount;
-                    if ($order->payment_type == 'Mobile Banking') $mfc += $order->total_paid_amount;
+                $sales_total = $orders->sum('subtotal');
+                $service_charge = $orders->sum('service_charge');
+                $vat_total = $orders->sum('vat_tax');
+                $grand_total = $orders->sum('grand_total');
+
+                // নতুন করে পেমেন্ট মেথড সামারি তৈরি করা হচ্ছে
+                $cash = 0; $card = 0; $mfc = 0;
+                foreach($orders as $order) {
+                    if ($order->payment_type == 'Split') {
+                        $cash += $order->paid_in_cash;
+                        $card += $order->paid_in_card;
+                        $mfc += $order->paid_in_mfc;
+                    } else {
+                        if ($order->payment_type == 'Cash') $cash += $order->total_paid_amount;
+                        if ($order->payment_type == 'Card') $card += $order->total_paid_amount;
+                        if ($order->payment_type == 'Mobile Banking') $mfc += $order->total_paid_amount;
+                    }
+                }
+
+                $incomes = [
+                    'Cash' => $cash,
+                    'Card' => $card,
+                    'MFC'  => $mfc
+                ];
+            }
+
+            // ডাটাবেজে আপডেট
+            $session->update([
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'weekday' => $startTime->format('l'),
+                'status' => $request->status,
+                'duration' => $duration,
+                'sales_total' => $request->status == 'Closed' ? $sales_total : 0,
+                'service_charge' => $request->status == 'Closed' ? $service_charge : 0,
+                'vat_total' => $request->status == 'Closed' ? $vat_total : 0,
+                'grand_total' => $request->status == 'Closed' ? $grand_total : 0,
+                'incomes_summary' => $request->status == 'Closed' ? $incomes : null
+            ]);
+
+            // Session History edit থেকে Open session Closed করলে অটোমেটিক নতুন session শুরু হবে
+            $shouldStartNewSession = $previousStatus == 'Open'
+                && $request->status == 'Closed'
+                && $endTime;
+
+            if ($shouldStartNewSession) {
+                $hasOpenSession = PosSession::where('user_id', $sessionUserId)
+                    ->where('status', 'Open')
+                    ->exists();
+
+                if (!$hasOpenSession) {
+                    PosSession::create([
+                        'user_id' => $sessionUserId,
+                        'weekday' => Carbon::now()->format('l'),
+                        'start_time' => Carbon::now(),
+                        'status' => 'Open'
+                    ]);
                 }
             }
 
-            $incomes = [
-                'Cash' => $cash,
-                'Card' => $card,
-                'MFC'  => $mfc
-            ];
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $shouldStartNewSession
+                    ? 'Session closed, report recalculated, and a new session started successfully!'
+                    : 'Session updated and report recalculated successfully!'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
-
-        // ডাটাবেজে আপডেট
-        $session->update([
-            'start_time' => $startTime,
-            'end_time' => $endTime,
-            'weekday' => $startTime->format('l'),
-            'status' => $request->status,
-            'duration' => $duration,
-            'sales_total' => $request->status == 'Closed' ? $sales_total : 0,
-            'service_charge' => $request->status == 'Closed' ? $service_charge : 0,
-            'vat_total' => $request->status == 'Closed' ? $vat_total : 0,
-            'grand_total' => $request->status == 'Closed' ? $grand_total : 0,
-            'incomes_summary' => $request->status == 'Closed' ? $incomes : null
-        ]);
-
-        return response()->json(['status' => 'success', 'message' => 'Session updated and report recalculated successfully!']);
     }
     public function getFoods(Request $request)
     {
@@ -242,40 +279,76 @@ public function printSessionReport($id)
     }
 
     public function addToCart(Request $request)
-    {
-        $cartKey = $this->getCartKey($request);
-        $cart = Session::get($cartKey, []);
+{
+    $cartKey = $this->getCartKey($request);
+    $cart = Session::get($cartKey, []);
 
-        $food = FoodItem::find($request->food_id);
-        $cartId = uniqid();
+    $food = FoodItem::findOrFail($request->food_id);
 
-        $price = $food->discount_price ?? $food->base_price;
-        $addonTotal = 0;
-        $addons = [];
+    $price = $food->discount_price ?? $food->base_price;
+    $addonTotal = 0;
+    $addons = [];
 
-        if ($request->addons) {
-            foreach ($request->addons as $addonId) {
-                $addon = \App\Models\FoodAddon::find($addonId);
-                if($addon) {
-                    $addons[] = ['name' => $addon->name, 'price' => $addon->price];
-                    $addonTotal += $addon->price;
-                }
+    if ($request->addons) {
+        foreach ($request->addons as $addonId) {
+            $addon = \App\Models\FoodAddon::find($addonId);
+            if ($addon) {
+                $addons[] = [
+                    'id' => $addon->id,
+                    'name' => $addon->name,
+                    'price' => $addon->price
+                ];
+                $addonTotal += $addon->price;
             }
         }
+    }
+
+    // Same addon combination detect করার জন্য sort করা হলো
+    usort($addons, function ($a, $b) {
+        return ($a['id'] ?? 0) <=> ($b['id'] ?? 0);
+    });
+
+    $newQty = (int) ($request->qty ?? 1);
+    $existingCartId = null;
+
+    foreach ($cart as $cartId => $item) {
+        $itemAddons = $item['addons'] ?? [];
+
+        usort($itemAddons, function ($a, $b) {
+            return ($a['id'] ?? 0) <=> ($b['id'] ?? 0);
+        });
+
+        if (
+            (int) $item['food_id'] === (int) $food->id &&
+            json_encode($itemAddons) === json_encode($addons)
+        ) {
+            $existingCartId = $cartId;
+            break;
+        }
+    }
+
+    if ($existingCartId !== null) {
+        // Product আগে থেকেই cart-এ থাকলে শুধু quantity বাড়বে
+        $cart[$existingCartId]['qty'] += $newQty;
+    } else {
+        // নতুন product হলে নতুন line add হবে
+        $cartId = uniqid();
 
         $cart[$cartId] = [
             'food_id' => $food->id,
             'name' => $food->name,
-            'qty' => $request->qty ?? 1,
+            'qty' => $newQty,
             'price' => $price,
             'addon_total' => $addonTotal,
             'addons' => $addons,
             'note' => ''
         ];
-
-        Session::put($cartKey, $cart);
-        return response()->json(['status' => 'success']);
     }
+
+    Session::put($cartKey, $cart);
+
+    return response()->json(['status' => 'success']);
+}
 
     public function getCart(Request $request)
     {

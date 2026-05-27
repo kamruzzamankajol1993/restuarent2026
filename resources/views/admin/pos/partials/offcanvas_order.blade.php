@@ -136,22 +136,16 @@
                     }
                 @endphp
 
-                @if($kitchenBusy)
-                    <button class="progga-btn progga-btn-secondary" disabled style="flex: 1; opacity: 0.6;">
-                        <i class="bi bi-hourglass-split"></i> Kitchen Busy
-                    </button>
-                @else
-                    <button class="progga-btn progga-btn-primary" id="ocPayBtn" style="flex: 1;"
-                    onclick='openPaymentModal({
-                        order_id: "{{ $order->id }}",
-                        order_type: "dine_in",
-                        table_no: "{{ $order->table->table_number ?? "Takeaway" }}",
-                        subtotal: {{ $order->subtotal ?? 0 }},
-                        items: @json($payItems)
-                    })'>
-                        <i class="bi bi-credit-card"></i> Payment
-                    </button>
-                @endif
+                <button class="progga-btn progga-btn-primary" id="ocPayBtn" style="flex: 1;"
+                onclick='openPaymentModal({
+                    order_id: "{{ $order->id }}",
+                    order_type: "dine_in",
+                    table_no: "{{ $order->table->table_number ?? "Takeaway" }}",
+                    subtotal: {{ $order->subtotal ?? 0 }},
+                    items: @json($payItems)
+                })'>
+                    <i class="bi bi-credit-card"></i> Payment
+                </button>
             @endif
         @endif
     </div>

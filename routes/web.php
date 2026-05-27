@@ -160,6 +160,8 @@ Route::post('food-category-status/{id}', [FoodCategoryController::class, 'update
     // ==========================================
     Route::get('orders', [App\Http\Controllers\Admin\OrderController::class, 'index'])->name('order.index');
     Route::get('orders/{id}', [App\Http\Controllers\Admin\OrderController::class, 'show'])->name('order.show');
+    Route::delete('orders/{id}', [App\Http\Controllers\Admin\OrderController::class, 'destroy'])
+    ->name('order.destroy');
 // Cuisine Type Routes
     Route::resource('cuisine-type', App\Http\Controllers\Admin\CuisineTypeController::class);
     Route::post('cuisine-type-status/{id}', [App\Http\Controllers\Admin\CuisineTypeController::class, 'updateStatus'])->name('cuisine-type.status');

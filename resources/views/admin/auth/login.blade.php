@@ -54,7 +54,7 @@
         </label>
         <div class="progga-input-group">
           <input type="email" id="loginEmail" name="email" class="progga-form-control @error('email') is-invalid @enderror"
-                 value="{{ old('email') }}" placeholder="admin@progga.com" required autocomplete="email" autofocus>
+                 value="{{ old('email') }}" placeholder="admin@company.com" required autocomplete="email" autofocus>
           <span class="progga-input-addon"><i class="bi bi-envelope"></i></span>
         </div>
         @error('email')
