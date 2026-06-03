@@ -35,7 +35,7 @@
   <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 
   <link rel="stylesheet" href="{{ asset('/') }}public/admin/assets/css/progga-style.css">
-
+ <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <style>
     /* New Web Order Alert modal height/dropdown fix */
     #newQrOrderModal {
@@ -270,7 +270,7 @@
     <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
 </audio>
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
@@ -686,7 +686,22 @@ $('#btnHoldQrOrder').on('click', function() {
     });
 });
 </script>
+<script>
+// Dynamic Export Script for Ajax Filters
+function exportReport(type, reportName) {
+    // URL জেনারেট করা (PDF বা CSV এর জন্য)
+    let baseUrl = (type === 'pdf') ? "{{ route('reports.export.pdf') }}" : "{{ route('reports.export.csv') }}";
 
+    // ফিল্টার ফর্ম থেকে কারেন্ট সিলেক্টেড ডেটাগুলো নেওয়া
+    let formData = $('#reportFilterForm').serialize();
+
+    // রিপোর্ট নাম এবং ফিল্টার ডেটা দিয়ে ফুল URL তৈরি করা
+    let exportUrl = baseUrl + "?report=" + reportName + "&" + formData;
+
+    // নতুন ট্যাবে পিডিএফ বা সিএসভি ডাউনলোড শুরু করা
+    window.open(exportUrl, '_blank');
+}
+</script>
   @yield('script')
 </body>
 </html>

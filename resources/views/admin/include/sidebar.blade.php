@@ -122,9 +122,21 @@
     <div class="progga-nav-section" ><div class="progga-nav-section-label">Analytics</div></div>
     @can('report-view')
 <div class="progga-nav-item">
-    <a class="progga-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
+    <a class="progga-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" data-bs-toggle="collapse" href="#reportsDropdown" role="button" aria-expanded="{{ request()->routeIs('reports.*') ? 'true' : 'false' }}" aria-controls="reportsDropdown">
         <i class="bi bi-bar-chart-fill progga-nav-icon"></i><span>Reports</span>
+        <i class="bi bi-chevron-down ms-auto" style="font-size: 11px;"></i>
     </a>
+    <div class="collapse {{ request()->routeIs('reports.*') ? 'show' : '' }}" id="reportsDropdown">
+        <a class="progga-nav-link {{ request()->routeIs('reports.index') || request()->routeIs('reports.sales_order') ? 'active' : '' }}" href="{{ route('reports.sales_order') }}" style="padding-left: 42px; font-size: 13px;">
+            <i class="bi bi-receipt-cutoff progga-nav-icon"></i><span>Sales & Order Report</span>
+        </a>
+        <a class="progga-nav-link {{ request()->routeIs('reports.payment_type_sales') ? 'active' : '' }}" href="{{ route('reports.payment_type_sales') }}" style="padding-left: 42px; font-size: 13px;">
+            <i class="bi bi-credit-card-2-front progga-nav-icon"></i><span>Payment Type Sales</span>
+        </a>
+        <a class="progga-nav-link {{ request()->routeIs('reports.food_sales') ? 'active' : '' }}" href="{{ route('reports.food_sales') }}" style="padding-left: 42px; font-size: 13px;">
+            <i class="bi bi-basket-fill progga-nav-icon"></i><span>Food Wise Sales</span>
+        </a>
+    </div>
 </div>
 @endcan
     <div class="progga-nav-section" ><div class="progga-nav-section-label">System</div></div>

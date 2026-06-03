@@ -80,7 +80,10 @@ Route::get('/refresh-csrf-token', function () {
 // ==========================================
     // Reports & Analytics Routes
     // ==========================================
-    Route::get('reports', [App\Http\Controllers\Admin\ReportController::class, 'index'])->name('reports.index');
+    Route::get('reports', [App\Http\Controllers\Admin\ReportController::class, 'salesOrder'])->name('reports.index');
+    Route::get('reports/sales-order', [App\Http\Controllers\Admin\ReportController::class, 'salesOrder'])->name('reports.sales_order');
+    Route::get('reports/payment-type-wise-sales', [App\Http\Controllers\Admin\ReportController::class, 'paymentTypeSales'])->name('reports.payment_type_sales');
+    Route::get('reports/food-wise-sales', [App\Http\Controllers\Admin\ReportController::class, 'foodSales'])->name('reports.food_sales');
     Route::get('reports/export/pdf', [App\Http\Controllers\Admin\ReportController::class, 'exportPdf'])->name('reports.export.pdf');
     Route::get('reports/export/csv', [App\Http\Controllers\Admin\ReportController::class, 'exportCsv'])->name('reports.export.csv');
 

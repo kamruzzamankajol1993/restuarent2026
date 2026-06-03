@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use App\Models\PosSession; // ফাইলের উপরে এটি যুক্ত করতে ভুলবেন না
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 class PosController extends Controller
 {
   public function index()
@@ -369,6 +370,18 @@ public function printSessionReport($id)
         return view('admin.pos.partials.cart_items', compact('cart', 'subtotal', 'vat_rate', 'service_charge_rate'))->render();
     }
 
+    /**
+     * Generate global KOT serial number.
+     * KOT number will continue across all orders: KOT-1, KOT-2, KOT-3...
+     */
+    private function generateGlobalKotNumber()
+    {
+        $lastKotNumber = OrderKot::where('kot_number', 'like', 'KOT-%')
+            ->selectRaw("MAX(CAST(REPLACE(kot_number, 'KOT-', '') AS UNSIGNED)) as max_number")
+            ->value('max_number');
+
+        return 'KOT-' . (((int) $lastKotNumber) + 1);
+    }
 
 public function placeOrder(Request $request)
     {
@@ -539,11 +552,11 @@ public function placeOrder(Request $request)
                 }
             }
 
-            // নতুন KOT জেনারেট করা
-            $kotCount = OrderKot::where('order_id', $order->id)->count();
+            // নতুন KOT জেনারেট করা (Global serial: KOT-1, KOT-2, KOT-3...)
+            $kotNumber = $this->generateGlobalKotNumber();
             $kot = OrderKot::create([
                 'order_id' => $order->id,
-                'kot_number' => 'KOT-' . ($kotCount + 1),
+                'kot_number' => $kotNumber,
                 'kitchen_status' => $isWaiter ? 'Hold' : 'Pending' // ওয়েটার হলে হোল্ড হবে
             ]);
 
@@ -567,7 +580,7 @@ public function placeOrder(Request $request)
 
             return response()->json([
                 'status' => 'success',
-                'message' => $isWaiter ? 'Order Sent to Front Desk!' : 'Food Added to Order! (KOT-' . ($kotCount + 1) . ')',
+                'message' => $isWaiter ? 'Order Sent to Front Desk!' : 'Food Added to Order! (' . $kotNumber . ')',
                 'kot_id' => $kot->id,
                 'redirect_url' => $isWaiter ? route('pos.index') : route('kitchen.print_kot', ['id' => $kot->id, 'source' => 'pos'])
             ]);
@@ -656,8 +669,14 @@ public function placeOrder(Request $request)
         }
 
         // যদি কোনো Hold KOT না থাকে (সব কিচেনে চলে গেছে), বা ওয়েটার নিজে ক্লিক করে, তবে আগের মতোই অফক্যানভাস খুলবে
-        $kitchenBusy = $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking'])->exists();
-        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy'))->render();
+        $finalPaymentDependsOnKitchenStatus = (bool) (DB::table('pos_settings')->value('final_payment_depends_on_kitchen_status') ?? 0);
+
+        // Setting YES হলে Ready না হওয়া পর্যন্ত Payment disabled থাকবে।
+        $kitchenBusy = $finalPaymentDependsOnKitchenStatus
+            ? $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking', 'Hold'])->exists()
+            : false;
+
+        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy', 'finalPaymentDependsOnKitchenStatus'))->render();
     }
 
     public function holdWebOrder(Request $request)
@@ -857,6 +876,22 @@ public function placeOrder(Request $request)
                 $order->save();
             }
 
+            $finalPaymentDependsOnKitchenStatus = (bool) (DB::table('pos_settings')->value('final_payment_depends_on_kitchen_status') ?? 0);
+
+            if ($request->filled('order_id') && $finalPaymentDependsOnKitchenStatus) {
+                $hasKitchenPending = OrderKot::where('order_id', $order->id)
+                    ->whereIn('kitchen_status', ['Pending', 'Cooking', 'Hold'])
+                    ->exists();
+
+                if ($hasKitchenPending) {
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Kitchen is busy. Payment is allowed only after all KOT items are Ready.'
+                    ]);
+                }
+            }
+
             $subtotal = $order->subtotal;
 
             // বিল ক্যালকুলেশনে সার্ভিস চার্জ চেক (শুধু Dine-In হলে সার্ভিস চার্জ কাটবে)
@@ -903,7 +938,24 @@ public function placeOrder(Request $request)
             $order->paid_in_card      = $card;
             $order->paid_in_mfc       = $mfc;
 
+            // POS থেকে Kitchen-এ পাঠানো সময় থেকে Final Payment পর্যন্ত সময় মিনিটে সেভ হবে।
+            if (Schema::hasColumn('orders', 'kitchen_to_payment_minutes')) {
+                $firstKitchenSentAt = OrderKot::where('order_id', $order->id)
+                    ->where('kitchen_status', '!=', 'Hold')
+                    ->orderBy('created_at', 'asc')
+                    ->value('created_at');
+
+                $order->kitchen_to_payment_minutes = $firstKitchenSentAt
+                    ? Carbon::parse($firstKitchenSentAt)->diffInMinutes(now())
+                    : null;
+            }
+
             $order->save();
+
+            // Final payment হলে kitchen dashboard থেকে সরানোর জন্য সব KOT Delivered করা হবে।
+            OrderKot::where('order_id', $order->id)
+                ->where('kitchen_status', '!=', 'Delivered')
+                ->update(['kitchen_status' => 'Delivered']);
 
             if (!$request->filled('order_id')) {
                 // সরাসরি কার্ট থেকে পেমেন্ট হলে OrderDetails এ ডাটা সেভ করা

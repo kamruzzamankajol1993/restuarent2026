@@ -34,6 +34,74 @@
     .progga-order-summary-row.grand { font-size: 15px; font-weight: 800; color: var(--progga-primary); padding-top: 10px; }
     .progga-order-summary-row span:last-child { font-weight: 700; color: var(--progga-text); }
     .progga-order-summary-row.grand span:last-child { color: var(--progga-primary); }
+
+    .progga-order-pagination-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--progga-border-light);
+      flex-wrap: wrap;
+    }
+    .progga-pagination-wrap { display: flex; justify-content: flex-end; }
+    .progga-pagination {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .progga-page-btn,
+    .progga-page-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      min-height: 34px;
+      padding: 7px 11px;
+      border: 1px solid var(--progga-border-light);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--progga-text);
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+      transition: all .15s ease;
+    }
+    .progga-page-num { min-width: 34px; padding-left: 9px; padding-right: 9px; }
+    .progga-page-btn:hover,
+    .progga-page-num:hover {
+      border-color: var(--progga-primary);
+      color: var(--progga-primary);
+      background: rgba(33, 53, 42, 0.05);
+    }
+    .progga-page-num.active {
+      background: var(--progga-primary);
+      border-color: var(--progga-primary);
+      color: #fff;
+      cursor: default;
+    }
+    .progga-page-btn.disabled {
+      opacity: .45;
+      pointer-events: none;
+      cursor: not-allowed;
+      background: #f8f9fa;
+    }
+    .progga-page-ellipsis {
+      padding: 0 4px;
+      color: var(--progga-text-muted);
+      font-weight: 800;
+    }
+    @media (max-width: 767.98px) {
+      .progga-order-pagination-footer {
+        justify-content: center;
+        text-align: center;
+      }
+      .progga-pagination {
+        justify-content: center;
+      }
+    }
+
 </style>
 @endsection
 

@@ -296,6 +296,54 @@
         };
     }
 
+
+    let newOrderModalMode = 'all';
+
+    function resetNewOrderModalCommon() {
+        $('#posWalkIn').prop('checked', true).trigger('change');
+        $('#order_notes').val('');
+        $('#newCustomerForm').hide();
+        $('#customerSearchContainer').show();
+        $('#new_cus_name, #new_cus_phone').val('');
+        $('#showNewCustomerFormBtn').text('+ Add New Customer').removeClass('progga-btn-danger').addClass('progga-btn-primary');
+    }
+
+    function openAllTypeOrderModal() {
+        newOrderModalMode = 'all';
+        currentOrder.table_id = null;
+        currentOrder.table_name = '';
+        currentOrder.order_type = 'dine_in';
+        currentOrder.order_id = null;
+
+        $('#labelDineIn, #labelTakeaway, #labelDelivery').show();
+        $('#posTypeDineIn, #posTypeTakeaway, #posTypeDelivery').prop('disabled', false);
+        $('#posTypeDineIn').prop('checked', true);
+        $('#modalTableSelect').val('');
+        $('#modalTableSelectSection').show();
+        $('#modalTableDisplaySection').hide();
+        resetNewOrderModalCommon();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
+    }
+
+    function openDineInTableModal(tableId, tableName) {
+        newOrderModalMode = 'table';
+        currentOrder.table_id = tableId;
+        currentOrder.table_name = tableName;
+        currentOrder.order_type = 'dine_in';
+        currentOrder.order_id = null;
+
+        $('#labelDineIn').show();
+        $('#labelTakeaway, #labelDelivery').hide();
+        $('#posTypeDineIn').prop('disabled', false).prop('checked', true);
+        $('#posTypeTakeaway, #posTypeDelivery').prop('disabled', true);
+        $('#modalTableSelect').val(tableId);
+        $('#modalTableSelectSection').hide();
+        $('#modalSelectedTableNum').text(tableName);
+        $('#modalTableDisplaySection').slideDown();
+        resetNewOrderModalCommon();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
+    }
+
     function showStep(step) {
         $('.progga-pos-screen').removeClass('active');
         $('#posStep' + step).addClass('active');
@@ -343,51 +391,46 @@
                 }
             });
         } else {
-            currentOrder.table_id = tId;
-            currentOrder.table_name = tNum;
-            currentOrder.order_type = 'dine_in';
-            currentOrder.order_id = null;
-
-            $('#posTypeDineIn, #labelDineIn').show();
-            $('#posTypeDineIn').prop('checked', true);
-            $('#modalTableDisplaySection').slideDown();
-            $('#modalSelectedTableNum').text(tNum);
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
+            openDineInTableModal(tId, tNum);
         }
     });
 
    $('#modeTakeaway').click(function() {
-        currentOrder.table_id = null;
-        currentOrder.table_name = 'Takeaway';
-        currentOrder.order_type = 'takeaway';
-        currentOrder.order_id = null;
-
-        $('#posTypeDineIn, #labelDineIn').hide();
-        $('#posTypeTakeaway').prop('checked', true);
-        $('#modalTableDisplaySection').slideUp();
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
+        openAllTypeOrderModal();
     });
 
    $('input[name="orderType"]').on('change', function() {
         let type = $(this).val();
+        currentOrder.order_type = type;
+        currentOrder.order_id = null;
 
         if(type === 'takeaway' || type === 'delivery') {
+            $('#modalTableSelectSection').slideUp();
             $('#modalTableDisplaySection').slideUp();
-            currentOrder.order_type = type;
+            $('#modalTableSelect').val('');
             currentOrder.table_id = null;
             currentOrder.table_name = type === 'takeaway' ? 'Takeaway' : 'Delivery';
-            currentOrder.order_id = null;
         } else {
-            if(currentOrder.table_id != null) {
+            if(newOrderModalMode === 'table') {
+                $('#modalTableSelectSection').hide();
                 $('#modalSelectedTableNum').text(currentOrder.table_name);
                 $('#modalTableDisplaySection').slideDown();
-                currentOrder.order_type = 'dine_in';
             } else {
-                Swal.fire('Notice', 'Please go back and select a table first.', 'info');
-                $(this).prop('checked', false);
-                $('#posTypeTakeaway').prop('checked', true);
-                currentOrder.order_type = 'takeaway';
+                $('#modalTableDisplaySection').hide();
+                $('#modalTableSelectSection').slideDown();
+                let selectedOption = $('#modalTableSelect option:selected');
+                currentOrder.table_id = $('#modalTableSelect').val() || null;
+                currentOrder.table_name = currentOrder.table_id ? (selectedOption.data('table-name') || selectedOption.text()) : '';
             }
+        }
+    });
+
+    $('#modalTableSelect').on('change', function() {
+        let selectedOption = $(this).find('option:selected');
+        currentOrder.table_id = $(this).val() || null;
+        currentOrder.table_name = currentOrder.table_id ? (selectedOption.data('table-name') || selectedOption.text()) : '';
+        if(currentOrder.table_id) {
+            $('#modalSelectedTableNum').text(currentOrder.table_name);
         }
     });
 
@@ -412,6 +455,25 @@
     });
 
     $('#posStartOrderBtn').click(function() {
+        let selectedOrderType = $('input[name="orderType"]:checked').val() || 'dine_in';
+        currentOrder.order_type = selectedOrderType;
+
+        if(selectedOrderType === 'dine_in') {
+            if(newOrderModalMode === 'all') {
+                let selectedOption = $('#modalTableSelect option:selected');
+                currentOrder.table_id = $('#modalTableSelect').val() || null;
+                currentOrder.table_name = currentOrder.table_id ? (selectedOption.data('table-name') || selectedOption.text()) : '';
+            }
+
+            if(!currentOrder.table_id) {
+                Swal.fire('Notice', 'Please select an available table for Dine-In order.', 'info');
+                return;
+            }
+        } else {
+            currentOrder.table_id = null;
+            currentOrder.table_name = selectedOrderType === 'takeaway' ? 'Takeaway' : 'Delivery';
+        }
+
         currentOrder.waiter_id = $('#posWaiterSelect').val();
         currentOrder.waiter_name = currentOrder.waiter_id ? $('#posWaiterSelect option:selected').text() : 'Unassigned';
         currentOrder.is_walk_in = $('#posWalkIn').is(':checked') ? 1 : 0;

@@ -54,10 +54,10 @@
       display: flex; align-items: flex-end; justify-content: space-between;
     }
     .kot-number {
-      font-size: 36px; font-weight: 900; color: #000; line-height: 1;
+      font-size: 15px; font-weight: 900; color: #000; line-height: 1;
     }
     .kot-number-label {
-      font-size: 10px; color: #000; font-weight: 900;
+      font-size: 18px; color: #000; font-weight: 900;
       margin-top: 3px; letter-spacing: .5px;
     }
     .kot-time {

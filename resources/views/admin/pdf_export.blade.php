@@ -57,16 +57,17 @@
             </tbody>
         </table>
     @else
+        @php $totalRevenue = $dataRows->where('status', 'Completed')->sum('grand_total'); @endphp
         <table class="table">
-            <thead><tr><th>SL</th><th>Period</th><th class="text-right">Total Sale</th><th class="text-center">Total Order</th></tr></thead>
+            <thead><tr><th>SL</th><th>Order #</th><th>Date & Time</th><th>Customer</th><th>Table</th><th>Payment</th><th class="text-right">Total</th><th>Status</th></tr></thead>
             <tbody>
-            @forelse($dataRows as $key => $row)
-                <tr><td>{{ $key + 1 }}</td><td>{{ $row['period'] }}</td><td class="text-right">৳{{ number_format($row['total_sale'], 2) }}</td><td class="text-center">{{ number_format($row['total_order']) }}</td></tr>
+            @forelse($dataRows as $key => $order)
+                <tr><td>{{ $key + 1 }}</td><td>#{{ $order->order_number }}</td><td>{{ $order->created_at->format('d/m/Y h:i A') }}</td><td>{{ $order->customer->name ?? 'Walk-in' }}</td><td>{{ $order->table->table_number ?? 'Takeaway' }}</td><td>{{ $order->payment_type ?? 'N/A' }}</td><td class="text-right">৳{{ number_format($order->grand_total, 2) }}</td><td>{{ $order->status }}</td></tr>
             @empty
-                <tr><td colspan="4" class="text-center">No sales/order data found.</td></tr>
+                <tr><td colspan="8" class="text-center">No orders found.</td></tr>
             @endforelse
             </tbody>
-            <tfoot><tr><th colspan="2" class="text-right">Total</th><th class="text-right">৳{{ number_format($periodTotalSale ?? 0, 2) }}</th><th class="text-center">{{ number_format($periodTotalOrder ?? 0) }}</th></tr></tfoot>
+            <tfoot><tr><th colspan="6" class="text-right">Total Revenue (Completed)</th><th class="text-right">৳{{ number_format($totalRevenue, 2) }}</th><th></th></tr></tfoot>
         </table>
     @endif
 

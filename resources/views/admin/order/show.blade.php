@@ -123,6 +123,12 @@
             </table>
         </div>
 
+        @php
+            $serviceRateText = rtrim(rtrim(number_format((float)($taxSettingServiceCharge ?? 0), 2), '0'), '.');
+            $vatRateText = rtrim(rtrim(number_format((float)($taxSettingVatRate ?? 0), 2), '0'), '.');
+            $taxLabelText = $taxSettingTaxLabel ?? 'VAT';
+        @endphp
+
         <div class="row">
             <div class="col-md-6 offset-md-6">
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
@@ -132,12 +138,12 @@
                             <td class="text-end fw-bold" style="width: 150px;">৳{{ number_format($order->subtotal, 2) }}</td>
                         </tr>
                         <tr>
-                            <td class="text-end text-muted fw-bold">VAT / Tax:</td>
-                            <td class="text-end fw-bold">৳{{ number_format($order->vat_tax, 2) }}</td>
+                            <td class="text-end text-muted fw-bold">Service Charge ({{ $serviceRateText }}%):</td>
+                            <td class="text-end fw-bold">৳{{ number_format($order->service_charge, 2) }}</td>
                         </tr>
                         <tr>
-                            <td class="text-end text-muted fw-bold">Service Charge:</td>
-                            <td class="text-end fw-bold">৳{{ number_format($order->service_charge, 2) }}</td>
+                            <td class="text-end text-muted fw-bold">{{ $taxLabelText }} ({{ $vatRateText }}%):</td>
+                            <td class="text-end fw-bold">৳{{ number_format($order->vat_tax, 2) }}</td>
                         </tr>
                         @if($order->discount_amount > 0)
                         <tr>
@@ -146,7 +152,7 @@
                         </tr>
                         @endif
                         <tr style="border-top: 2px solid #ccc;">
-                            <td class="text-end fw-bold fs-5 pt-2" style="color: var(--progga-primary);">Grand Total:</td>
+                            <td class="text-end fw-bold fs-5 pt-2" style="color: var(--progga-primary);">TOTAL:</td>
                             <td class="text-end fw-bold fs-5 pt-2" style="color: var(--progga-primary);">৳{{ number_format($order->grand_total, 2) }}</td>
                         </tr>
                         <tr>

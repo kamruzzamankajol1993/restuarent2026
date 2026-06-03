@@ -71,19 +71,34 @@ class HomeController extends Controller
             $orderStatuses['Cancelled'] ?? 0,
         ];
 
-        // ৭. Top Selling Items Chart (This Week)
-        $topItems = OrderDetail::select('product_name', DB::raw('SUM(quantity) as total_qty'))
-            ->whereHas('order', function($q) {
-                $q->where('created_at', '>=', Carbon::now()->startOfWeek());
-            })
-            ->groupBy('product_name')
-            ->orderBy('total_qty', 'desc')
-            ->limit(5)
+        // ৭. Top Selling Items Chart (This Year)
+        // Food Wise Sales report-এর একই logic: only Completed orders + current year + qty sum.
+   // ৭. Top Selling Items Chart (This Year) - ফুড রিপোর্ট পেজের হুবহু একই কুয়েরি লজিক
+        // ৭. Top Selling Items Chart (This Year) - ফুড রিপোর্টের হুবহু র-লজিক ফিক্স
+        $currentYear = \Carbon\Carbon::now()->year;
+
+        $foodRowsFromReport = OrderDetail::query()
+            ->join('orders', 'order_details.order_id', '=', 'orders.id')
+            ->where('orders.status', 'Completed')
+            ->whereYear('orders.created_at', $currentYear) // ফুড রিপোর্টের মত ডিরেক্ট Year চেক
+            ->select(
+                'order_details.product_name',
+                DB::raw('SUM(order_details.quantity) as total_qty')
+            )
+            ->groupBy('order_details.product_name')
+            ->orderByRaw('SUM(order_details.quantity) DESC') // র-অর্ডার ডিসেন্ডিং
+            ->take(5)
             ->get();
 
-        $topItemsLabels = $topItems->pluck('product_name')->toArray();
-        $topItemsData = $topItems->pluck('total_qty')->toArray();
+        $topItemsLabels = $foodRowsFromReport->pluck('product_name')->toArray();
+        $topItemsData = $foodRowsFromReport->pluck('total_qty')->map(function ($qty) {
+            return (int) $qty;
+        })->toArray();
 
+        //dd($topItemsLabels, $topItemsData);
+
+
+//dd(1);
         // ৮. Kitchen Queue (Pending / Cooking / Ready)
         $kitchenQueue = Order::with(['table', 'orderDetails'])
             ->whereIn('status', ['Pending', 'Cooking', 'Ready'])

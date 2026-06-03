@@ -9,6 +9,7 @@
         <th>Payment</th>
         <th>Status</th>
         <th>Time</th>
+        <th>Kitchen to Payment</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -61,6 +62,7 @@
               <span class="progga-badge progga-badge-{{ $badgeClass }}"><i class="bi {{ $iconClass }}"></i> {{ $order->status }}</span>
             </td>
             <td><span class="progga-order-time">{{ $order->created_at->diffForHumans() }}</span></td>
+            <td><span class="progga-order-time">{{ is_null($order->kitchen_to_payment_minutes) ? '—' : $order->kitchen_to_payment_minutes . ' min' }}</span></td>
             <td>
   <div class="progga-table-actions d-flex align-items-center gap-1">
     <button class="progga-btn progga-btn-outline progga-btn-icon progga-btn-sm"
@@ -96,15 +98,73 @@
 </td>
           </tr>
       @empty
-          <tr><td colspan="8" class="text-center py-4">No orders found.</td></tr>
+          <tr><td colspan="9" class="text-center py-4">No orders found.</td></tr>
       @endforelse
     </tbody>
   </table>
 </div>
 
-<div class="progga-card-footer" style="display:flex;align-items:center;justify-content:space-between;">
-  <span class="progga-page-info">Showing {{ $orders->firstItem() ?? 0 }}–{{ $orders->lastItem() ?? 0 }} of {{ $orders->total() }} orders</span>
-  <div class="progga-pagination">
-      {{ $orders->links('pagination::bootstrap-4') }}
-  </div>
+@php
+    $currentPage = $orders->currentPage();
+    $lastPage = $orders->lastPage();
+    $startPage = max(1, $currentPage - 2);
+    $endPage = min($lastPage, $currentPage + 2);
+@endphp
+
+<div class="progga-card-footer progga-order-pagination-footer">
+  <span class="progga-page-info">
+    Showing {{ $orders->firstItem() ?? 0 }}–{{ $orders->lastItem() ?? 0 }} of {{ $orders->total() }} orders
+  </span>
+
+  @if($lastPage > 1)
+    <nav class="progga-pagination-wrap" aria-label="Order pagination">
+      <div class="progga-pagination">
+        <a href="{{ $orders->url(1) }}"
+           class="progga-page-btn {{ $orders->onFirstPage() ? 'disabled' : '' }}"
+           aria-label="First page">
+          <i class="bi bi-chevron-double-left"></i> First
+        </a>
+
+        <a href="{{ $orders->previousPageUrl() ?: '#' }}"
+           class="progga-page-btn {{ $orders->onFirstPage() ? 'disabled' : '' }}"
+           aria-label="Previous page">
+          <i class="bi bi-chevron-left"></i> Prev
+        </a>
+
+        @if($startPage > 1)
+          <a href="{{ $orders->url(1) }}" class="progga-page-num">1</a>
+          @if($startPage > 2)
+            <span class="progga-page-ellipsis">...</span>
+          @endif
+        @endif
+
+        @for($page = $startPage; $page <= $endPage; $page++)
+          @if($page == $currentPage)
+            <span class="progga-page-num active">{{ $page }}</span>
+          @else
+            <a href="{{ $orders->url($page) }}" class="progga-page-num">{{ $page }}</a>
+          @endif
+        @endfor
+
+        @if($endPage < $lastPage)
+          @if($endPage < $lastPage - 1)
+            <span class="progga-page-ellipsis">...</span>
+          @endif
+          <a href="{{ $orders->url($lastPage) }}" class="progga-page-num">{{ $lastPage }}</a>
+        @endif
+
+        <a href="{{ $orders->nextPageUrl() ?: '#' }}"
+           class="progga-page-btn {{ !$orders->hasMorePages() ? 'disabled' : '' }}"
+           aria-label="Next page">
+          Next <i class="bi bi-chevron-right"></i>
+        </a>
+
+        <a href="{{ $orders->url($lastPage) }}"
+           class="progga-page-btn {{ $currentPage == $lastPage ? 'disabled' : '' }}"
+           aria-label="Last page">
+          Last <i class="bi bi-chevron-double-right"></i>
+        </a>
+      </div>
+    </nav>
+  @endif
 </div>

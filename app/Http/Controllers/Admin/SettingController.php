@@ -87,9 +87,12 @@ class SettingController extends Controller
         $data['auto_print_invoice'] = $request->has('auto_print_invoice');
         $data['require_table_selection'] = $request->has('require_table_selection');
         $data['show_out_of_stock'] = $request->has('show_out_of_stock');
+        $data['final_payment_depends_on_kitchen_status'] = $request->has('final_payment_depends_on_kitchen_status');
 
         $pos = PosSetting::first() ?? new PosSetting();
-        $pos->fill($data)->save();
+        $pos->fill($data);
+        $pos->final_payment_depends_on_kitchen_status = $request->has('final_payment_depends_on_kitchen_status');
+        $pos->save();
         return back()->with('success', 'POS preferences updated!');
     }
 }

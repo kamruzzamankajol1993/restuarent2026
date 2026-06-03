@@ -54,7 +54,7 @@ class OrderController extends Controller
             }
         }
 
-        $orders = $query->orderBy('id', 'desc')->paginate(10);
+        $orders = $query->orderBy('id', 'desc')->paginate(10)->appends($request->query());
 
         // AJAX Response for table
         if ($request->ajax()) {
@@ -149,6 +149,19 @@ class OrderController extends Controller
         ]);
     }
 
+    /**
+     * Generate global KOT serial number.
+     * KOT number will continue across all orders: KOT-1, KOT-2, KOT-3...
+     */
+    private function generateGlobalKotNumber()
+    {
+        $lastKotNumber = \App\Models\OrderKot::where('kot_number', 'like', 'KOT-%')
+            ->selectRaw("MAX(CAST(REPLACE(kot_number, 'KOT-', '') AS UNSIGNED)) as max_number")
+            ->value('max_number');
+
+        return 'KOT-' . (((int) $lastKotNumber) + 1);
+    }
+
    public function acceptQrOrder(Request $request)
 {
     \Illuminate\Support\Facades\DB::beginTransaction();
@@ -175,11 +188,11 @@ class OrderController extends Controller
         $order->preparation_time = $request->preparation_time ?? 20;
         $order->save();
 
-        // ৩. কিচেন KOT জেনারেট করা
-        $kotCount = \App\Models\OrderKot::where('order_id', $order->id)->count();
+        // ৩. কিচেন KOT জেনারেট করা (Global serial: KOT-1, KOT-2, KOT-3...)
+        $kotNumber = $this->generateGlobalKotNumber();
         $kotId = \Illuminate\Support\Facades\DB::table('order_kots')->insertGetId([
             'order_id' => $order->id,
-            'kot_number' => 'KOT-' . ($kotCount + 1),
+            'kot_number' => $kotNumber,
             'kitchen_status' => 'Pending',
             'created_at' => now(),
             'updated_at' => now(),

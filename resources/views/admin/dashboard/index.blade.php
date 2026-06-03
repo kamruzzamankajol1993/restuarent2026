@@ -109,14 +109,35 @@ Dashboard — {{ $restaurantSettingName ?? 'TableTrack RMS' }}
 
     <div class="row g-3 mb-4">
       <div class="col-xl-5">
-        <div class="progga-card">
+        <div class="progga-card" style="height: 100%;">
           <div class="progga-card-header">
             <div class="progga-card-title">Top Selling Items</div>
-            <span class="progga-badge progga-badge-secondary">This Week</span>
+            <span class="progga-badge progga-badge-secondary">This Year</span>
           </div>
-          <div class="progga-card-body">
-            <div class="progga-chart-container" style="height:220px;">
-              <canvas id="topItemsChart"></canvas>
+          <div class="progga-card-body" style="padding: 20px;">
+            <div class="progga-progress-list" style="display: flex; flex-direction: column; gap: 16px;">
+              @php
+                $maxQty = count($topItemsData) > 0 ? max($topItemsData) : 1;
+              @endphp
+              @forelse($topItemsLabels as $index => $label)
+                @php
+                  $currentQty = $topItemsData[$index] ?? 0;
+                  $percentage = ($currentQty / $maxQty) * 100;
+                  // সুন্দর থিম কালার অ্যাসাইনমেন্ট
+                  $barColor = $index == 0 ? '#21352a' : ($index == 1 ? '#2c4436' : '#d5aa65');
+                @endphp
+                <div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #444; margin-bottom: 6px;">
+                    <span>{{ $label }}</span>
+                    <span style="color: #666;">{{ $currentQty }} Qty</span>
+                  </div>
+                  <div style="width: 100%; height: 14px; background-color: rgba(33, 53, 42, 0.08); border-radius: 6px; overflow: hidden;">
+                    <div style="width: {{ $percentage }}%; height: 100%; background-color: {{ $barColor }}; border-radius: 6px; transition: width 0.5s ease;"></div>
+                  </div>
+                </div>
+              @empty
+                <div class="text-center py-3 text-muted">No data found.</div>
+              @endforelse
             </div>
           </div>
         </div>
@@ -278,31 +299,6 @@ document.addEventListener("DOMContentLoaded", function() {
             cutout: '75%',
             plugins: {
                 legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true, padding: 20 } }
-            }
-        }
-    });
-
-    // 3. Top Items Bar Chart
-    const ctxTopItems = document.getElementById('topItemsChart').getContext('2d');
-    new Chart(ctxTopItems, {
-        type: 'bar',
-        data: {
-            labels: @json($topItemsLabels),
-            datasets: [{
-                label: 'Qty Sold',
-                data: @json($topItemsData),
-                backgroundColor: '#d5aa65',
-                borderRadius: 4,
-                barThickness: 16
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            indexAxis: 'y', // Horizontal bar
-            scales: {
-                x: { beginAtZero: true, grid: { borderDash: [4, 4] } },
-                y: { grid: { display: false } }
             }
         }
     });

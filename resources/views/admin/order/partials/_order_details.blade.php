@@ -71,12 +71,20 @@
 
   <div class="row justify-content-end">
     <div class="col-sm-6">
+      @php
+          $serviceRateText = rtrim(rtrim(number_format((float)($taxSettingServiceCharge ?? 0), 2), '0'), '.');
+          $vatRateText = rtrim(rtrim(number_format((float)($taxSettingVatRate ?? 0), 2), '0'), '.');
+          $taxLabelText = $taxSettingTaxLabel ?? 'VAT';
+      @endphp
       <div style="background:var(--progga-bg-secondary);border-radius:var(--progga-radius);padding:16px;">
         <div class="progga-order-summary-row">
           <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 2) }}</span>
         </div>
         <div class="progga-order-summary-row">
-          <span>Tax & Service</span><span>৳{{ number_format($order->vat_tax + $order->service_charge, 2) }}</span>
+          <span>Service Charge ({{ $serviceRateText }}%)</span><span>৳{{ number_format($order->service_charge, 2) }}</span>
+        </div>
+        <div class="progga-order-summary-row">
+          <span>{{ $taxLabelText }} ({{ $vatRateText }}%)</span><span>৳{{ number_format($order->vat_tax, 2) }}</span>
         </div>
         @if($order->discount_amount > 0)
         <div class="progga-order-summary-row text-danger">
@@ -84,7 +92,7 @@
         </div>
         @endif
         <div class="progga-order-summary-row grand">
-          <span>Grand Total</span><span>৳{{ number_format($order->grand_total, 2) }}</span>
+          <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 2) }}</span>
         </div>
       </div>
       <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">

@@ -77,11 +77,9 @@
             <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 0) }}</span>
         </div>
 
-        @if($order->service_charge > 0)
         <div class="progga-oc-total-row">
             <span>Service Charge ({{ $taxSettingServiceCharge }}%)</span><span>৳{{ number_format($order->service_charge, 0) }}</span>
         </div>
-        @endif
 
         <div class="progga-oc-total-row">
             <span>{{ $taxSettingTaxLabel }} ({{ $taxSettingVatRate }}%)</span><span>৳{{ number_format($order->vat_tax, 0) }}</span>
@@ -136,16 +134,22 @@
                     }
                 @endphp
 
-                <button class="progga-btn progga-btn-primary" id="ocPayBtn" style="flex: 1;"
-                onclick='openPaymentModal({
-                    order_id: "{{ $order->id }}",
-                    order_type: "dine_in",
-                    table_no: "{{ $order->table->table_number ?? "Takeaway" }}",
-                    subtotal: {{ $order->subtotal ?? 0 }},
-                    items: @json($payItems)
-                })'>
-                    <i class="bi bi-credit-card"></i> Payment
-                </button>
+                @if(!empty($kitchenBusy))
+                    <button class="progga-btn progga-btn-secondary" id="ocPayBtn" disabled style="flex: 1; opacity: 0.75; cursor: not-allowed;">
+                        <i class="bi bi-hourglass-split"></i> Kitchen Busy
+                    </button>
+                @else
+                    <button class="progga-btn progga-btn-primary" id="ocPayBtn" style="flex: 1;"
+                    onclick='openPaymentModal({
+                        order_id: "{{ $order->id }}",
+                        order_type: "dine_in",
+                        table_no: "{{ $order->table->table_number ?? "Takeaway" }}",
+                        subtotal: {{ $order->subtotal ?? 0 }},
+                        items: @json($payItems)
+                    })'>
+                        <i class="bi bi-credit-card"></i> Payment
+                    </button>
+                @endif
             @endif
         @endif
     </div>

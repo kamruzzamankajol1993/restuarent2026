@@ -2,10 +2,10 @@
     <div class="pos-s1-top">
       <div class="pos-s1-heading-wrap">
         <h2 class="pos-s1-title">Select a Table</h2>
-        <p class="pos-s1-sub">Tap an available table to begin a new dine-in order</p>
+        <p class="pos-s1-sub">Tap a table for dine-in or use New Order for any order type</p>
       </div>
       <button class="pos-s1-takeaway-btn" id="modeTakeaway" type="button">
-        <i class="bi bi-bag-fill"></i> New Takeaway
+        <i class="bi bi-plus-circle-fill"></i> New Order
       </button>
     </div>
 
