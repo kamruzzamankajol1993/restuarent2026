@@ -3,6 +3,9 @@
         <div class="progga-pos-cart-item">
             <div class="progga-pos-item-name">
                 {{ $item['name'] }}
+                @if(!empty($item['is_complimentary']))
+                    <span class="badge bg-success ms-1" style="font-size: 9px;">Complimentary</span>
+                @endif
                 @if(count($item['addons']) > 0)
                     <div style="font-size: 10px; color: #777; font-weight: normal; margin-top: 2px;">
                         @foreach($item['addons'] as $addon) +{{ $addon['name'] }} @endforeach
@@ -11,7 +14,14 @@
             </div>
             <div class="progga-pos-item-controls">
                 <button class="progga-qty-btn" type="button" onclick="updateQty('{{ $cartId }}', 'minus')">−</button>
-                <span class="progga-qty-display">{{ $item['qty'] }}</span>
+                <input type="number"
+                       class="progga-qty-display progga-qty-input"
+                       value="{{ $item['qty'] }}"
+                       min="0"
+                       step="1"
+                       onkeyup="scheduleCartQtyUpdate('{{ $cartId }}', this.value, this)"
+                       onchange="setCartQty('{{ $cartId }}', this.value, this)"
+                       onkeydown="if(event.key === 'Enter') { event.preventDefault(); setCartQty('{{ $cartId }}', this.value, this); }">
                 <button class="progga-qty-btn" type="button" onclick="updateQty('{{ $cartId }}', 'plus')">+</button>
                 <span class="progga-pos-item-total">৳{{ round(($item['price'] + $item['addon_total']) * $item['qty']) }}</span>
                 <button class="progga-pos-item-remove" type="button" onclick="removeCartItem('{{ $cartId }}')">
@@ -75,6 +85,23 @@
         <i class="bi bi-fire"></i> Send to Kitchen
     </button>
 </div>
+
+<style>
+    .progga-qty-input {
+        width: 42px;
+        height: 28px;
+        border: 1px solid var(--progga-border);
+        border-radius: 6px;
+        text-align: center;
+        font-weight: 800;
+        padding: 0 4px;
+        background: #fff;
+    }
+    .progga-qty-input::-webkit-outer-spin-button,
+    .progga-qty-input::-webkit-inner-spin-button {
+        margin: 0;
+    }
+</style>
 
 <script>
     // Toggle Takeaway/Delivery Buttons

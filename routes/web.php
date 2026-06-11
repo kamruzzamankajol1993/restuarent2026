@@ -119,6 +119,7 @@ Route::post('/kitchen/mark-unavailable', [App\Http\Controllers\Admin\KitchenCont
     Route::post('/pos/cart/add', [App\Http\Controllers\Admin\PosController::class, 'addToCart'])->name('pos.cart.add');
     Route::post('/pos/cart/update', [App\Http\Controllers\Admin\PosController::class, 'updateCart'])->name('pos.cart.update');
     Route::post('/pos/cart/remove', [App\Http\Controllers\Admin\PosController::class, 'removeFromCart'])->name('pos.cart.remove');
+    Route::post('/pos/order-item/remove', [App\Http\Controllers\Admin\PosController::class, 'removeOrderedItem'])->name('pos.order_item.remove');
     Route::post('/pos/cart/clear', [App\Http\Controllers\Admin\PosController::class, 'clearCart'])->name('pos.cart.clear');
 Route::get('reviews', [App\Http\Controllers\Admin\ReviewController::class, 'index'])->name('reviews.index');
     // POS: Order & Payment
@@ -163,6 +164,7 @@ Route::post('food-category-status/{id}', [FoodCategoryController::class, 'update
     // ==========================================
     Route::get('orders', [App\Http\Controllers\Admin\OrderController::class, 'index'])->name('order.index');
     Route::get('orders/{id}', [App\Http\Controllers\Admin\OrderController::class, 'show'])->name('order.show');
+    Route::get('orders/{id}/delete-history', [App\Http\Controllers\Admin\OrderController::class, 'deletedHistory'])->name('order.delete_history');
     Route::delete('orders/{id}', [App\Http\Controllers\Admin\OrderController::class, 'destroy'])
     ->name('order.destroy');
 // Cuisine Type Routes

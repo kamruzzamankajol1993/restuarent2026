@@ -66,6 +66,7 @@ class ReportController extends Controller
 
         // টোটাল সামারি কার্ডের জন্য ডেটা
         $totalRevenue = (clone $query)->sum('grand_total');
+        $totalDiscount = (clone $query)->sum('discount_amount');
         $totalOrders = (clone $query)->count();
         $avgOrderValue = $totalOrders > 0 ? ($totalRevenue / $totalOrders) : 0;
         $uniqueCustomers = (clone $query)->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id');
@@ -75,7 +76,7 @@ class ReportController extends Controller
         if ($filterType === 'year') {
             // মাস ভিত্তিক গ্রুপ (Jan 2026, Feb 2026)
             $sales = (clone $query)
-                ->select(DB::raw('MONTH(created_at) as m'), DB::raw('YEAR(created_at) as y'), DB::raw('SUM(grand_total) as total_sales'), DB::raw('COUNT(id) as total_orders'))
+                ->select(DB::raw('MONTH(created_at) as m'), DB::raw('YEAR(created_at) as y'), DB::raw('SUM(grand_total) as total_sales'), DB::raw('SUM(discount_amount) as total_discount'), DB::raw('COUNT(id) as total_orders'))
                 ->groupBy('y', 'm')
                 ->get();
 
@@ -85,13 +86,14 @@ class ReportController extends Controller
                 $periodData[] = [
                     'period' => $carbonObj->format('M Y'),
                     'total_orders' => $row ? $row->total_orders : 0,
-                    'total_sales' => $row ? (float)$row->total_sales : 0
+                    'total_sales' => $row ? (float)$row->total_sales : 0,
+                    'total_discount' => $row ? (float)$row->total_discount : 0
                 ];
             }
         } else {
             // মাস বা নির্দিষ্ট ডেট রেঞ্জের জন্য দিন ভিত্তিক গ্রুপ (01/12/2025)
             $sales = (clone $query)
-                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(grand_total) as total_sales'), DB::raw('COUNT(id) as total_orders'))
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(grand_total) as total_sales'), DB::raw('SUM(discount_amount) as total_discount'), DB::raw('COUNT(id) as total_orders'))
                 ->groupBy('d')
                 ->get();
 
@@ -101,18 +103,20 @@ class ReportController extends Controller
                 $periodData[] = [
                     'period' => $date->format('d/m/Y'),
                     'total_orders' => $row ? $row->total_orders : 0,
-                    'total_sales' => $row ? (float)$row->total_sales : 0
+                    'total_sales' => $row ? (float)$row->total_sales : 0,
+                    'total_discount' => $row ? (float)$row->total_discount : 0
                 ];
             }
         }
 
         if ($request->ajax()) {
             return response()->json([
-                'html' => view('admin.reports.partials.sales_table_rows', compact('periodData', 'totalRevenue', 'totalOrders'))->render(),
+                'html' => view('admin.reports.partials.sales_table_rows', compact('periodData', 'totalRevenue', 'totalDiscount', 'totalOrders'))->render(),
                 'summary' => [
-                    'revenue' => '৳' . number_format($totalRevenue, 2),
+                    'revenue' => '৳' . number_format($totalRevenue, 0),
+                    'discount' => '৳' . number_format($totalDiscount, 0),
                     'orders' => $totalOrders,
-                    'avg' => '৳' . number_format($avgOrderValue, 2),
+                    'avg' => '৳' . number_format($avgOrderValue, 0),
                     'customers' => $uniqueCustomers
                 ]
             ]);
@@ -120,7 +124,7 @@ class ReportController extends Controller
 
         return view('admin.reports.sales_order', compact(
             'filterType', 'year', 'month', 'startDate', 'endDate', 'yearOptions',
-            'totalRevenue', 'totalOrders', 'avgOrderValue', 'uniqueCustomers', 'periodData'
+            'totalRevenue', 'totalDiscount', 'totalOrders', 'avgOrderValue', 'uniqueCustomers', 'periodData'
         ));
     }
 
@@ -224,7 +228,7 @@ class ReportController extends Controller
 
         if ($filterType === 'year') {
             $sales = (clone $query)
-                ->select(DB::raw('MONTH(created_at) as m'), DB::raw('YEAR(created_at) as y'), DB::raw('SUM(grand_total) as total_sale'), DB::raw('COUNT(id) as total_order'))
+                ->select(DB::raw('MONTH(created_at) as m'), DB::raw('YEAR(created_at) as y'), DB::raw('SUM(grand_total) as total_sale'), DB::raw('SUM(discount_amount) as total_discount'), DB::raw('COUNT(id) as total_order'))
                 ->groupBy('y', 'm')
                 ->get();
 
@@ -234,12 +238,13 @@ class ReportController extends Controller
                 $periodRows[] = [
                     'period' => $carbonObj->format('M Y'),
                     'total_sale' => $row ? (float) $row->total_sale : 0,
+                    'total_discount' => $row ? (float) $row->total_discount : 0,
                     'total_order' => $row ? (int) $row->total_order : 0,
                 ];
             }
         } else {
             $sales = (clone $query)
-                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(grand_total) as total_sale'), DB::raw('COUNT(id) as total_order'))
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(grand_total) as total_sale'), DB::raw('SUM(discount_amount) as total_discount'), DB::raw('COUNT(id) as total_order'))
                 ->groupBy('d')
                 ->get();
 
@@ -249,6 +254,7 @@ class ReportController extends Controller
                 $periodRows[] = [
                     'period' => $date->format('d/m/Y'),
                     'total_sale' => $row ? (float) $row->total_sale : 0,
+                    'total_discount' => $row ? (float) $row->total_discount : 0,
                     'total_order' => $row ? (int) $row->total_order : 0,
                 ];
             }
@@ -320,6 +326,7 @@ class ReportController extends Controller
         }
 
         $periodTotalSale = 0;
+        $periodTotalDiscount = 0;
         $periodTotalOrder = 0;
 
         if ($report === 'payment_type_sales') {
@@ -329,10 +336,11 @@ class ReportController extends Controller
         } else {
             $dataRows = $this->salesOrderExportRows($filterType, $year, $startDate, $endDate);
             $periodTotalSale = $dataRows->sum('total_sale');
+            $periodTotalDiscount = $dataRows->sum('total_discount');
             $periodTotalOrder = $dataRows->sum('total_order');
         }
 
-        return compact('report', 'dataRows', 'startDate', 'endDate', 'periodTotalSale', 'periodTotalOrder') + [
+        return compact('report', 'dataRows', 'startDate', 'endDate', 'periodTotalSale', 'periodTotalDiscount', 'periodTotalOrder') + [
             'restaurant' => RestaurantSetting::first(),
         ];
     }

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\OrderDetail;
 use App\Models\OrderKot;
 use App\Models\Table;
+use App\Models\PosDeletedItemHistory;
 class OrderController extends Controller
 {
     public function index(Request $request)
@@ -233,6 +234,19 @@ class OrderController extends Controller
 
         // ফুল-পেজ ব্লেড ফাইল রিটার্ন করা হচ্ছে
         return view('admin.order.show', compact('order'));
+    }
+
+
+    public function deletedHistory($id)
+    {
+        $order = Order::with(['customer', 'table'])->findOrFail($id);
+
+        $histories = PosDeletedItemHistory::with('user')
+            ->where('order_id', $order->id)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return view('admin.order.partials._delete_history', compact('order', 'histories'))->render();
     }
 
     public function destroy($id)

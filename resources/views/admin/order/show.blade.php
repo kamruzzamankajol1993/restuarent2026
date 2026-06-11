@@ -54,9 +54,9 @@
                 @if($order->payment_type == 'Split')
                     <div class="mt-3 p-2" style="background: rgba(33, 53, 42, 0.05); border-radius: 6px; font-size: 13px; border: 1px dashed var(--progga-border);">
                         <strong style="color: var(--progga-primary);">Split Breakdown:</strong><br>
-                        Cash: <span style="font-weight:700;">৳{{ number_format($order->paid_in_cash, 2) }}</span> <br>
-                        Card: <span style="font-weight:700;">৳{{ number_format($order->paid_in_card, 2) }}</span> <br>
-                        MFC: <span style="font-weight:700;">৳{{ number_format($order->paid_in_mfc, 2) }}</span>
+                        Cash: <span style="font-weight:700;">৳{{ number_format($order->paid_in_cash, 0) }}</span> <br>
+                        Card: <span style="font-weight:700;">৳{{ number_format($order->paid_in_card, 0) }}</span> <br>
+                        MFC: <span style="font-weight:700;">৳{{ number_format($order->paid_in_mfc, 0) }}</span>
                     </div>
                 @endif
             </div>
@@ -101,6 +101,9 @@
                         <td class="text-center text-muted">{{ $index + 1 }}</td>
                         <td>
                             <strong style="color: var(--progga-text);">{{ $item->product_name }}</strong>
+                            @if((isset($item->is_complimentary) && $item->is_complimentary) || ((float) $item->price <= 0 && (float) $item->subtotal <= 0))
+                                <span class="badge bg-success ms-1" style="font-size: 9px;">Complimentary</span>
+                            @endif
                             @if($item->food_note)
                                 <div style="font-size: 11px; color: #d33; font-style: italic;">Note: {{ $item->food_note }}</div>
                             @endif
@@ -115,8 +118,8 @@
                             @endif
                         </td>
                         <td class="text-center fw-bold">x{{ $item->quantity }}</td>
-                        <td class="text-end">৳{{ number_format($item->price, 2) }}</td>
-                        <td class="text-end fw-bold" style="color: var(--progga-primary);">৳{{ number_format($item->subtotal, 2) }}</td>
+                        <td class="text-end">৳{{ number_format($item->price, 0) }}</td>
+                        <td class="text-end fw-bold" style="color: var(--progga-primary);">৳{{ number_format($item->subtotal, 0) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -135,33 +138,33 @@
                     <table class="table table-sm table-borderless mb-0" style="font-size: 14px;">
                         <tr>
                             <td class="text-end text-muted fw-bold">Subtotal:</td>
-                            <td class="text-end fw-bold" style="width: 150px;">৳{{ number_format($order->subtotal, 2) }}</td>
+                            <td class="text-end fw-bold" style="width: 150px;">৳{{ number_format($order->subtotal, 0) }}</td>
                         </tr>
                         <tr>
                             <td class="text-end text-muted fw-bold">Service Charge ({{ $serviceRateText }}%):</td>
-                            <td class="text-end fw-bold">৳{{ number_format($order->service_charge, 2) }}</td>
+                            <td class="text-end fw-bold">৳{{ number_format($order->service_charge, 0) }}</td>
                         </tr>
                         <tr>
                             <td class="text-end text-muted fw-bold">{{ $taxLabelText }} ({{ $vatRateText }}%):</td>
-                            <td class="text-end fw-bold">৳{{ number_format($order->vat_tax, 2) }}</td>
+                            <td class="text-end fw-bold">৳{{ number_format($order->vat_tax, 0) }}</td>
                         </tr>
                         @if($order->discount_amount > 0)
                         <tr>
                             <td class="text-end fw-bold" style="color: #d33;">Discount ({{ ucfirst($order->discount_type) }}):</td>
-                            <td class="text-end fw-bold" style="color: #d33;">- ৳{{ number_format($order->discount_amount, 2) }}</td>
+                            <td class="text-end fw-bold" style="color: #d33;">- ৳{{ number_format($order->discount_amount, 0) }}</td>
                         </tr>
                         @endif
                         <tr style="border-top: 2px solid #ccc;">
                             <td class="text-end fw-bold fs-5 pt-2" style="color: var(--progga-primary);">TOTAL:</td>
-                            <td class="text-end fw-bold fs-5 pt-2" style="color: var(--progga-primary);">৳{{ number_format($order->grand_total, 2) }}</td>
+                            <td class="text-end fw-bold fs-5 pt-2" style="color: var(--progga-primary);">৳{{ number_format($order->grand_total, 0) }}</td>
                         </tr>
                         <tr>
                             <td class="text-end fw-bold text-success pt-3">Total Paid Amount:</td>
-                            <td class="text-end text-success fw-bold pt-3">৳{{ number_format($order->total_paid_amount, 2) }}</td>
+                            <td class="text-end text-success fw-bold pt-3">৳{{ number_format($order->total_paid_amount, 0) }}</td>
                         </tr>
                         <tr>
                             <td class="text-end fw-bold text-danger">Due Amount:</td>
-                            <td class="text-end text-danger fw-bold fs-6">৳{{ number_format($order->due, 2) }}</td>
+                            <td class="text-end text-danger fw-bold fs-6">৳{{ number_format($order->due, 0) }}</td>
                         </tr>
                     </table>
                 </div>

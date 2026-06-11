@@ -286,7 +286,8 @@ public function printSessionReport($id)
 
     $food = FoodItem::findOrFail($request->food_id);
 
-    $price = $food->discount_price ?? $food->base_price;
+    $isComplimentary = $request->boolean('is_complimentary');
+    $price = $isComplimentary ? 0 : ($food->discount_price ?? $food->base_price);
     $addonTotal = 0;
     $addons = [];
 
@@ -297,9 +298,9 @@ public function printSessionReport($id)
                 $addons[] = [
                     'id' => $addon->id,
                     'name' => $addon->name,
-                    'price' => $addon->price
+                    'price' => $isComplimentary ? 0 : $addon->price
                 ];
-                $addonTotal += $addon->price;
+                $addonTotal += $isComplimentary ? 0 : $addon->price;
             }
         }
     }
@@ -321,6 +322,7 @@ public function printSessionReport($id)
 
         if (
             (int) $item['food_id'] === (int) $food->id &&
+            (bool) ($item['is_complimentary'] ?? false) === $isComplimentary &&
             json_encode($itemAddons) === json_encode($addons)
         ) {
             $existingCartId = $cartId;
@@ -329,7 +331,7 @@ public function printSessionReport($id)
     }
 
     if ($existingCartId !== null) {
-        // Product আগে থেকেই cart-এ থাকলে শুধু quantity বাড়বে
+        // Product আগে থেকেই cart-এ থাকলে শুধু quantity বাড়বে; position change হবে না
         $cart[$existingCartId]['qty'] += $newQty;
     } else {
         // নতুন product হলে নতুন line add হবে
@@ -342,6 +344,7 @@ public function printSessionReport($id)
             'price' => $price,
             'addon_total' => $addonTotal,
             'addons' => $addons,
+            'is_complimentary' => $isComplimentary,
             'note' => ''
         ];
     }
@@ -360,6 +363,9 @@ public function printSessionReport($id)
         foreach($cart as $item) {
             $subtotal += ($item['price'] + $item['addon_total']) * $item['qty'];
         }
+
+        // Latest added item list-এর শুরুতে দেখানোর জন্য render করার আগে reverse করা হলো
+        $cart = array_reverse($cart, true);
 
         $taxSetting = DB::table('tax_settings')->first();
         $vat_rate = $taxSetting ? $taxSetting->vat_rate : 0;
@@ -562,7 +568,7 @@ public function placeOrder(Request $request)
 
             // কার্টের আইটেমগুলো নতুন KOT-তে সেভ করা
             foreach ($cart as $item) {
-                OrderDetail::create([
+                $detailData = [
                     'order_id' => $order->id,
                     'order_kot_id' => $kot->id,
                     'product_id' => $item['food_id'],
@@ -572,7 +578,13 @@ public function placeOrder(Request $request)
                     'subtotal' => ($item['price'] + $item['addon_total']) * $item['qty'],
                     'addons' => json_encode($item['addons']),
                     'food_note' => $item['note'] ?? null
-                ]);
+                ];
+
+                if (Schema::hasColumn('order_details', 'is_complimentary')) {
+                    $detailData['is_complimentary'] = !empty($item['is_complimentary']) ? 1 : 0;
+                }
+
+                OrderDetail::create($detailData);
             }
 
             Session::forget($cartKey);
@@ -910,7 +922,8 @@ public function placeOrder(Request $request)
             // পেমেন্ট স্প্লিট এবং Due ক্যালকুলেশন
             // ===============================================
             $paymentMethod = $request->payment_method;
-            $totalPaid = $request->total_paid_amount ?? 0;
+            $totalPaid = (float) ($request->total_paid_amount ?? 0);
+            $tipsAmount = max(0, round($totalPaid - $grand_total, 2));
 
             // স্প্লিট পেমেন্ট হলে আলাদা ইনপুট থেকে ডাটা নিবে
             $cash = ($paymentMethod == 'Split') ? ($request->paid_in_cash ?? 0) : (($paymentMethod == 'Cash') ? $totalPaid : 0);
@@ -934,6 +947,9 @@ public function placeOrder(Request $request)
             $order->status            = 'Completed'; // স্ট্যাটাস ১০০% আপডেট হবে
             $order->due               = $due;
             $order->total_paid_amount = $totalPaid;
+            if (Schema::hasColumn('orders', 'tips_amount')) {
+                $order->tips_amount = $tipsAmount;
+            }
             $order->paid_in_cash      = $cash;
             $order->paid_in_card      = $card;
             $order->paid_in_mfc       = $mfc;
@@ -964,14 +980,22 @@ public function placeOrder(Request $request)
 
                 $cart = Session::get($cartKey, []);
                 foreach ($cart as $item) {
-                    OrderDetail::create([
+                    $detailData = [
                         'order_id'     => $order->id, // এখন $order->id ঠিকমতো পাবে
                         'product_id'   => $item['food_id'],
                         'product_name' => $item['name'],
                         'quantity'     => $item['qty'],
                         'price'        => $item['price'],
                         'subtotal'     => ($item['price'] + $item['addon_total']) * $item['qty'],
-                    ]);
+                        'addons'       => json_encode($item['addons'] ?? []),
+                        'food_note'    => $item['note'] ?? null,
+                    ];
+
+                    if (Schema::hasColumn('order_details', 'is_complimentary')) {
+                        $detailData['is_complimentary'] = !empty($item['is_complimentary']) ? 1 : 0;
+                    }
+
+                    OrderDetail::create($detailData);
                 }
                 Session::forget($cartKey); // যে কার্ট থেকে অর্ডার হয়েছে শুধু সেটি ক্লিয়ার হবে
             }
@@ -992,18 +1016,137 @@ public function placeOrder(Request $request)
         }
     }
 
+    private function logDeletedCartOrOrderItem(array $data)
+    {
+        // Migration run না থাকলেও POS delete flow যেন crash না করে
+        if (!Schema::hasTable('pos_deleted_item_histories')) {
+            return;
+        }
+
+        DB::table('pos_deleted_item_histories')->insert([
+            'order_id' => $data['order_id'] ?? null,
+            'order_detail_id' => $data['order_detail_id'] ?? null,
+            'order_kot_id' => $data['order_kot_id'] ?? null,
+            'food_id' => $data['food_id'] ?? null,
+            'product_name' => $data['product_name'] ?? null,
+            'unit_price' => $data['unit_price'] ?? 0,
+            'addon_total' => $data['addon_total'] ?? 0,
+            'deleted_quantity' => $data['deleted_quantity'] ?? 0,
+            'previous_quantity' => $data['previous_quantity'] ?? 0,
+            'remaining_quantity' => $data['remaining_quantity'] ?? 0,
+            'subtotal_removed' => $data['subtotal_removed'] ?? 0,
+            'source' => $data['source'] ?? 'cart',
+            'cart_key' => $data['cart_key'] ?? null,
+            'cart_item_key' => $data['cart_item_key'] ?? null,
+            'order_type' => $data['order_type'] ?? null,
+            'table_id' => $data['table_id'] ?? null,
+            'addons' => isset($data['addons']) ? json_encode($data['addons']) : null,
+            'note' => $data['note'] ?? null,
+            'deleted_by' => auth()->id(),
+            'reason' => $data['reason'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     public function updateCart(Request $request)
     {
         $cartKey = $this->getCartKey($request);
         $cart = Session::get($cartKey, []);
 
         if(isset($cart[$request->cart_id])) {
+            $item = $cart[$request->cart_id];
+            $previousQty = (int) ($item['qty'] ?? 0);
+            $unitTotal = (float) (($item['price'] ?? 0) + ($item['addon_total'] ?? 0));
+
             if($request->action == 'plus') {
                 $cart[$request->cart_id]['qty'] += 1;
             } elseif($request->action == 'minus') {
                 if($cart[$request->cart_id]['qty'] > 1) {
                     $cart[$request->cart_id]['qty'] -= 1;
+                    $this->logDeletedCartOrOrderItem([
+                        'source' => 'cart',
+                        'cart_key' => $cartKey,
+                        'cart_item_key' => $request->cart_id,
+                        'food_id' => $item['food_id'] ?? null,
+                        'product_name' => $item['name'] ?? null,
+                        'unit_price' => $item['price'] ?? 0,
+                        'addon_total' => $item['addon_total'] ?? 0,
+                        'deleted_quantity' => 1,
+                        'previous_quantity' => $previousQty,
+                        'remaining_quantity' => $previousQty - 1,
+                        'subtotal_removed' => $unitTotal,
+                        'order_type' => $request->order_type,
+                        'table_id' => $request->table_id,
+                        'addons' => $item['addons'] ?? [],
+                        'note' => $item['note'] ?? null,
+                        'reason' => 'Quantity decreased from cart',
+                    ]);
                 } else {
+                    $this->logDeletedCartOrOrderItem([
+                        'source' => 'cart',
+                        'cart_key' => $cartKey,
+                        'cart_item_key' => $request->cart_id,
+                        'food_id' => $item['food_id'] ?? null,
+                        'product_name' => $item['name'] ?? null,
+                        'unit_price' => $item['price'] ?? 0,
+                        'addon_total' => $item['addon_total'] ?? 0,
+                        'deleted_quantity' => $previousQty,
+                        'previous_quantity' => $previousQty,
+                        'remaining_quantity' => 0,
+                        'subtotal_removed' => $unitTotal * $previousQty,
+                        'order_type' => $request->order_type,
+                        'table_id' => $request->table_id,
+                        'addons' => $item['addons'] ?? [],
+                        'note' => $item['note'] ?? null,
+                        'reason' => 'Cart item removed by minus button',
+                    ]);
+                    unset($cart[$request->cart_id]);
+                }
+            } elseif($request->action == 'set') {
+                $qty = (int) $request->qty;
+                if($qty > 0) {
+                    if ($qty < $previousQty) {
+                        $deletedQty = $previousQty - $qty;
+                        $this->logDeletedCartOrOrderItem([
+                            'source' => 'cart',
+                            'cart_key' => $cartKey,
+                            'cart_item_key' => $request->cart_id,
+                            'food_id' => $item['food_id'] ?? null,
+                            'product_name' => $item['name'] ?? null,
+                            'unit_price' => $item['price'] ?? 0,
+                            'addon_total' => $item['addon_total'] ?? 0,
+                            'deleted_quantity' => $deletedQty,
+                            'previous_quantity' => $previousQty,
+                            'remaining_quantity' => $qty,
+                            'subtotal_removed' => $unitTotal * $deletedQty,
+                            'order_type' => $request->order_type,
+                            'table_id' => $request->table_id,
+                            'addons' => $item['addons'] ?? [],
+                            'note' => $item['note'] ?? null,
+                            'reason' => 'Cart quantity manually reduced',
+                        ]);
+                    }
+                    $cart[$request->cart_id]['qty'] = $qty;
+                } else {
+                    $this->logDeletedCartOrOrderItem([
+                        'source' => 'cart',
+                        'cart_key' => $cartKey,
+                        'cart_item_key' => $request->cart_id,
+                        'food_id' => $item['food_id'] ?? null,
+                        'product_name' => $item['name'] ?? null,
+                        'unit_price' => $item['price'] ?? 0,
+                        'addon_total' => $item['addon_total'] ?? 0,
+                        'deleted_quantity' => $previousQty,
+                        'previous_quantity' => $previousQty,
+                        'remaining_quantity' => 0,
+                        'subtotal_removed' => $unitTotal * $previousQty,
+                        'order_type' => $request->order_type,
+                        'table_id' => $request->table_id,
+                        'addons' => $item['addons'] ?? [],
+                        'note' => $item['note'] ?? null,
+                        'reason' => 'Cart item removed by quantity input',
+                    ]);
                     unset($cart[$request->cart_id]);
                 }
             }
@@ -1030,10 +1173,139 @@ public function placeOrder(Request $request)
         $cart = Session::get($cartKey, []);
 
         if(isset($cart[$request->cart_id])) {
+            $item = $cart[$request->cart_id];
+            $qty = (int) ($item['qty'] ?? 0);
+            $unitTotal = (float) (($item['price'] ?? 0) + ($item['addon_total'] ?? 0));
+
+            $this->logDeletedCartOrOrderItem([
+                'source' => 'cart',
+                'cart_key' => $cartKey,
+                'cart_item_key' => $request->cart_id,
+                'food_id' => $item['food_id'] ?? null,
+                'product_name' => $item['name'] ?? null,
+                'unit_price' => $item['price'] ?? 0,
+                'addon_total' => $item['addon_total'] ?? 0,
+                'deleted_quantity' => $qty,
+                'previous_quantity' => $qty,
+                'remaining_quantity' => 0,
+                'subtotal_removed' => $unitTotal * $qty,
+                'order_type' => $request->order_type,
+                'table_id' => $request->table_id,
+                'addons' => $item['addons'] ?? [],
+                'note' => $item['note'] ?? null,
+                'reason' => 'Cart item removed by trash button',
+            ]);
+
             unset($cart[$request->cart_id]);
             Session::put($cartKey, $cart);
         }
         return response()->json(['status' => 'success']);
+    }
+
+
+    public function removeOrderedItem(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|exists:orders,id',
+            'order_detail_id' => 'required|exists:order_details,id',
+            'qty' => 'required|integer|min:1',
+            'reason' => 'nullable|string|max:1000',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $order = Order::lockForUpdate()->findOrFail($request->order_id);
+            $detail = OrderDetail::where('order_id', $order->id)
+                ->lockForUpdate()
+                ->findOrFail($request->order_detail_id);
+
+            if (!empty($detail->is_unavailable)) {
+                DB::rollBack();
+                return response()->json(['status' => 'error', 'message' => 'Unavailable item cannot be deleted again.']);
+            }
+
+            $currentQty = max(1, (int) $detail->quantity);
+            $deleteQty = min((int) $request->qty, $currentQty);
+            $deleteReason = trim((string) ($request->reason ?? ''));
+            $unitTotal = $currentQty > 0 ? ((float) $detail->subtotal / $currentQty) : 0;
+            $removeAmount = round($unitTotal * $deleteQty, 2);
+            $addons = json_decode($detail->addons ?? '[]', true);
+            if (!is_array($addons)) $addons = [];
+            $addonTotal = 0;
+            foreach ($addons as $addon) {
+                $addonTotal += (float) ($addon['price'] ?? 0);
+            }
+
+            $this->logDeletedCartOrOrderItem([
+                'source' => 'ordered_item',
+                'order_id' => $order->id,
+                'order_detail_id' => $detail->id,
+                'order_kot_id' => $detail->order_kot_id,
+                'food_id' => $detail->product_id,
+                'product_name' => $detail->product_name,
+                'unit_price' => $detail->price ?? 0,
+                'addon_total' => $addonTotal,
+                'deleted_quantity' => $deleteQty,
+                'previous_quantity' => $currentQty,
+                'remaining_quantity' => max(0, $currentQty - $deleteQty),
+                'subtotal_removed' => $removeAmount,
+                'order_type' => $order->order_type,
+                'table_id' => $order->table_id,
+                'addons' => $addons,
+                'note' => $detail->food_note ?? null,
+                'reason' => $deleteReason !== ''
+                    ? $deleteReason
+                    : ($deleteQty >= $currentQty ? 'Ordered item fully deleted from offcanvas' : 'Ordered item quantity deleted from offcanvas'),
+            ]);
+
+            if ($deleteQty >= $currentQty) {
+                $kotId = $detail->order_kot_id;
+                $detail->delete();
+
+                if ($kotId) {
+                    $hasDetails = OrderDetail::where('order_kot_id', $kotId)->exists();
+                    if (!$hasDetails) {
+                        OrderKot::where('id', $kotId)->delete();
+                    }
+                }
+            } else {
+                $detail->quantity = $currentQty - $deleteQty;
+                $detail->subtotal = max(0, round((float) $detail->subtotal - $removeAmount, 2));
+                $detail->save();
+            }
+
+            $newSubtotal = max(0, round((float) $order->subtotal - $removeAmount, 2));
+            $taxSetting = DB::table('tax_settings')->first();
+            $vatRate = $taxSetting->vat_rate ?? 0;
+            $serviceRate = (strtolower($order->order_type) == 'dine-in' || strtolower($order->order_type) == 'dine_in')
+                ? ($taxSetting->service_charge ?? 0)
+                : 0;
+
+            $serviceCharge = round(($newSubtotal * $serviceRate) / 100);
+            $vatTax = round((($newSubtotal + $serviceCharge) * $vatRate) / 100);
+            // orders.discount_amount-এ calculated discount amount থাকে, তাই item delete হলেও একই amount cap করে রাখা হলো
+            $discountAmount = min(round((float) ($order->discount_amount ?? 0)), round($newSubtotal + $serviceCharge + $vatTax));
+            $grandTotal = max(0, round(($newSubtotal + $serviceCharge + $vatTax) - $discountAmount));
+            $totalPaid = (float) ($order->total_paid_amount ?? 0);
+
+            $order->subtotal = $newSubtotal;
+            $order->service_charge = $serviceCharge;
+            $order->vat_tax = $vatTax;
+            $order->grand_total = $grandTotal;
+            $order->due = max(0, $grandTotal - $totalPaid);
+            $order->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Item quantity deleted successfully.'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
     }
 
 
@@ -1062,6 +1334,13 @@ public function placeOrder(Request $request)
     {
         $order = Order::with(['orderDetails', 'customer', 'waiter', 'user'])->findOrFail($id);
         $restaurant = \App\Models\RestaurantSetting::first();
+
+        // Invoice/receipt must not show tips. Keep the saved payment untouched in DB,
+        // but cap any paid amount exposed to the invoice view at grand total.
+        $invoicePaidAmount = min((float) ($order->total_paid_amount ?? 0), (float) ($order->grand_total ?? 0));
+        $order->total_paid_amount = $invoicePaidAmount;
+        $order->invoice_paid_amount = $invoicePaidAmount;
+
         return view('admin.pos.invoice', compact('order', 'restaurant'));
     }
 

@@ -52,7 +52,7 @@
                 <td>{{ $order->created_at->format('d/m/y h:i A') }}</td>
                 <td>{{ $order->customer->name ?? 'Walk-in' }}</td>
                 <td>{{ $order->order_type }}</td>
-                <td class="text-right">{{ number_format($order->grand_total, 2) }}</td>
+                <td class="text-right">{{ number_format($order->grand_total, 0) }}</td>
                 <td class="text-center status-badge status-{{ strtolower($order->status) }}">
                     {{ $order->status }}
                 </td>
@@ -72,7 +72,7 @@
         <tfoot>
             <tr>
                 <th colspan="5" class="text-right" style="background: #f8f9fa; color: #333;">Total Revenue (Completed Orders):</th>
-                <th class="text-right" style="background: #f8f9fa; color: #21352a; font-size: 14px;">{{ number_format($totalRevenue, 2) }}</th>
+                <th class="text-right" style="background: #f8f9fa; color: #21352a; font-size: 14px;">{{ number_format($totalRevenue, 0) }}</th>
                 <th style="background: #f8f9fa;"></th>
             </tr>
         </tfoot>

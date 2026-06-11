@@ -47,6 +47,10 @@
                             {{ $item->product_name }}
                         @endif
 
+                        @if((isset($item->is_complimentary) && $item->is_complimentary) || ((float) $item->price <= 0 && (float) $item->subtotal <= 0))
+                            <span class="badge bg-success" style="font-size: 9px; margin-left: 5px;">Complimentary</span>
+                        @endif
+
                         @if(count($addons) > 0)
                             <div style="font-size: 10px; color: #777; font-weight: normal; margin-top: 2px;">
                                 + @foreach($addons as $addon) {{ $addon['name'] }}{{ !$loop->last ? ', ' : '' }} @endforeach
@@ -65,6 +69,15 @@
                             ৳{{ round($item->subtotal) }}
                         @endif
                     </span>
+
+                    @if(!$item->is_unavailable && !auth()->user()->hasRole('waiter'))
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger progga-oc-item-delete"
+                                title="Delete item quantity"
+                                onclick="openOrderItemDeleteModal({{ $order->id }}, {{ $item->id }}, '{{ addslashes($item->product_name) }}', {{ (int) $item->quantity }})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -113,6 +126,16 @@
                 <i class="bi bi-plus-circle"></i> Add More Food
             </button>
 
+            <button class="progga-btn progga-btn-secondary" id="btnAddComplimentary" style="flex: 1;"
+                    data-order-id="{{ $order->id }}"
+                    data-table-id="{{ $order->table_id }}"
+                    data-waiter-id="{{ $order->waiter_id }}"
+                    data-waiter-name="{{ $order->waiter->name ?? '' }}"
+                    data-customer-id="{{ $order->customer_id }}"
+                    data-customer-name="{{ $order->customer->name ?? '' }}">
+                <i class="bi bi-gift"></i> Add Complimentary
+            </button>
+
             @if(auth()->user()->hasRole('waiter'))
                 <button class="progga-btn progga-btn-secondary" disabled style="flex: 1; opacity: 0.6;">
                     <i class="bi bi-lock"></i> Payment at Desk
@@ -152,5 +175,48 @@
                 @endif
             @endif
         @endif
+    </div>
+</div>
+
+
+<style>
+    .progga-oc-item-delete {
+        padding: 3px 7px;
+        line-height: 1;
+        border-radius: 6px;
+        margin-left: 6px;
+        flex: 0 0 auto;
+    }
+</style>
+
+<div class="modal fade progga-modal" id="orderItemDeleteModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+            <div class="modal-header bg-danger text-white">
+                <h6 class="modal-title fw-bold mb-0"><i class="bi bi-trash me-1"></i> Delete Product</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="orderItemDeleteForm">
+                <div class="modal-body">
+                    <input type="hidden" id="deleteOrderId" name="order_id">
+                    <input type="hidden" id="deleteOrderDetailId" name="order_detail_id">
+
+                    <div class="fw-bold mb-1" id="deleteOrderItemName"></div>
+                    <div class="text-muted mb-3" style="font-size: 12px;">Available quantity: <strong id="deleteOrderItemMaxQty">0</strong></div>
+
+                    <label class="form-label fw-bold" style="font-size: 12px;">How many quantity do you want to delete?</label>
+                    <input type="number" class="form-control text-center fw-bold" id="deleteOrderItemQty" name="qty" min="1" value="1" required>
+
+                    <label class="form-label fw-bold mt-3" style="font-size: 12px;">Reason <span class="text-muted fw-normal">(optional)</span></label>
+                    <textarea class="form-control" id="deleteOrderItemReason" name="reason" rows="3" placeholder="Write delete reason..." style="font-size: 13px; resize: vertical;"></textarea>
+
+                    <button type="button" class="btn btn-link text-danger fw-bold p-0 mt-2" id="btnDeleteFullQty">Delete full product</button>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger fw-bold" id="btnConfirmOrderItemDelete">Delete</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>

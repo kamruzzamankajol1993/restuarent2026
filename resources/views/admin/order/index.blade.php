@@ -160,7 +160,7 @@
         <div class="progga-stat-icon secondary"><i class="bi bi-currency-exchange"></i></div>
         <div class="progga-stat-info">
           <div class="progga-stat-label">Revenue Today</div>
-          <div class="progga-stat-value">৳{{ number_format($stats['revenue_today'], 2) }}</div>
+          <div class="progga-stat-value">৳{{ number_format($stats['revenue_today'], 0) }}</div>
         </div>
       </div>
     </div>
@@ -215,6 +215,13 @@
   </div>
 </div>
 
+<div class="modal fade progga-modal" id="deleteHistoryModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content" id="deleteHistoryModalContent">
+        </div>
+  </div>
+</div>
+
 @endsection
 
 @section('script')
@@ -257,6 +264,18 @@
             $('#modalContentArea').html(data);
         }).fail(function() {
             $('#modalContentArea').html('<div class="p-4 text-danger text-center">Failed to load data.</div>');
+        });
+    };
+
+
+    window.viewDeleteHistory = function(id) {
+        $('#deleteHistoryModalContent').html('<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteHistoryModal')).show();
+
+        $.get("{{ url('orders') }}/" + id + "/delete-history", function(data) {
+            $('#deleteHistoryModalContent').html(data);
+        }).fail(function() {
+            $('#deleteHistoryModalContent').html('<div class="p-4 text-danger text-center">Failed to load delete history.</div>');
         });
     };
 

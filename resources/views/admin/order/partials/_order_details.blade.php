@@ -56,13 +56,16 @@
           <td>{{ $index + 1 }}</td>
           <td>
               <strong>{{ $item->product_name }}</strong>
+              @if((isset($item->is_complimentary) && $item->is_complimentary) || ((float) $item->price <= 0 && (float) $item->subtotal <= 0))
+                  <span class="badge bg-success ms-1" style="font-size: 9px;">Complimentary</span>
+              @endif
               @if($item->food_note)
                   <div style="font-size: 11px; color: #d33;">* {{ $item->food_note }}</div>
               @endif
           </td>
           <td class="text-center">{{ $item->quantity }}</td>
-          <td class="text-end">৳{{ number_format($item->price, 2) }}</td>
-          <td class="text-end"><strong>৳{{ number_format($item->subtotal, 2) }}</strong></td>
+          <td class="text-end">৳{{ number_format($item->price, 0) }}</td>
+          <td class="text-end"><strong>৳{{ number_format($item->subtotal, 0) }}</strong></td>
         </tr>
         @endforeach
       </tbody>
@@ -78,21 +81,21 @@
       @endphp
       <div style="background:var(--progga-bg-secondary);border-radius:var(--progga-radius);padding:16px;">
         <div class="progga-order-summary-row">
-          <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 2) }}</span>
+          <span>Subtotal</span><span>৳{{ number_format($order->subtotal, 0) }}</span>
         </div>
         <div class="progga-order-summary-row">
-          <span>Service Charge ({{ $serviceRateText }}%)</span><span>৳{{ number_format($order->service_charge, 2) }}</span>
+          <span>Service Charge ({{ $serviceRateText }}%)</span><span>৳{{ number_format($order->service_charge, 0) }}</span>
         </div>
         <div class="progga-order-summary-row">
-          <span>{{ $taxLabelText }} ({{ $vatRateText }}%)</span><span>৳{{ number_format($order->vat_tax, 2) }}</span>
+          <span>{{ $taxLabelText }} ({{ $vatRateText }}%)</span><span>৳{{ number_format($order->vat_tax, 0) }}</span>
         </div>
         @if($order->discount_amount > 0)
         <div class="progga-order-summary-row text-danger">
-          <span>Discount</span><span>−৳{{ number_format($order->discount_amount, 2) }}</span>
+          <span>Discount</span><span>−৳{{ number_format($order->discount_amount, 0) }}</span>
         </div>
         @endif
         <div class="progga-order-summary-row grand">
-          <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 2) }}</span>
+          <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 0) }}</span>
         </div>
       </div>
       <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">

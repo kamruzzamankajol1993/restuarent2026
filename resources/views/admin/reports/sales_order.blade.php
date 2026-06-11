@@ -32,6 +32,7 @@
             <th>Period</th>
             <th>Total Orders</th>
             <th>Total Sales</th>
+            <th>Discount Report</th>
           </tr>
         </thead>
         <tbody id="salesReportContainer">

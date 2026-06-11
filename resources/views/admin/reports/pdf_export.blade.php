@@ -20,7 +20,7 @@
 </head>
 <body>
     <div class="header">
-        <h2>{{ $restaurant->name ?? 'Progga RMS' }}</h2>
+        <h2>{{ $restaurant->name ?? 'TableTrack RMS' }}</h2>
         <p>{{ $restaurant->address ?? '' }} | Phone: {{ $restaurant->phone ?? 'N/A' }}</p>
         <div class="report-title">
             @if($report === 'payment_type_sales')
@@ -58,18 +58,18 @@
         </table>
     @else
         <table class="table">
-            <thead><tr><th>SL</th><th>Period</th><th class="text-right">Total Sale</th><th class="text-center">Total Order</th></tr></thead>
+            <thead><tr><th>SL</th><th>Period</th><th class="text-right">Total Sale</th><th class="text-right">Discount Report</th><th class="text-center">Total Order</th></tr></thead>
             <tbody>
             @forelse($dataRows as $key => $row)
-                <tr><td>{{ $key + 1 }}</td><td>{{ $row['period'] }}</td><td class="text-right">৳{{ number_format($row['total_sale'], 2) }}</td><td class="text-center">{{ number_format($row['total_order']) }}</td></tr>
+                <tr><td>{{ $key + 1 }}</td><td>{{ $row['period'] }}</td><td class="text-right">৳{{ number_format($row['total_sale'], 0) }}</td><td class="text-right">৳{{ number_format($row['total_discount'] ?? 0, 0) }}</td><td class="text-center">{{ number_format($row['total_order']) }}</td></tr>
             @empty
-                <tr><td colspan="4" class="text-center">No sales/order data found.</td></tr>
+                <tr><td colspan="5" class="text-center">No sales/order data found.</td></tr>
             @endforelse
             </tbody>
-            <tfoot><tr><th colspan="2" class="text-right">Total</th><th class="text-right">৳{{ number_format($periodTotalSale ?? 0, 2) }}</th><th class="text-center">{{ number_format($periodTotalOrder ?? 0) }}</th></tr></tfoot>
+            <tfoot><tr><th colspan="2" class="text-right">Total</th><th class="text-right">৳{{ number_format($periodTotalSale ?? 0, 0) }}</th><th class="text-right">৳{{ number_format($periodTotalDiscount ?? 0, 0) }}</th><th class="text-center">{{ number_format($periodTotalOrder ?? 0) }}</th></tr></tfoot>
         </table>
     @endif
 
-    <div class="footer">Generated on: {{ now()->format('d M, Y h:i A') }} | Tech Partner: Progga RMS</div>
+    <div class="footer">Generated on: {{ now()->format('d M, Y h:i A') }} | Tech Partner: TableTrack RMS</div>
 </body>
 </html>

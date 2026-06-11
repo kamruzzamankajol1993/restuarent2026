@@ -99,7 +99,7 @@
             <button type="button" class="progga-btn progga-btn-secondary progga-btn-sm text-decoration-none" data-bs-toggle="modal" data-bs-target="#sessionHistoryModal">
                 <i class="bi bi-history"></i> Session History
             </button>
-            <a href="{{ route('home') }}" class="progga-pos-close m-0"><i class="bi bi-x-lg"></i></a>
+            <a href="{{ route('home') }}" class="progga-pos-close m-0"><i class="bi bi-house"></i></a>
         @else
             <form action="{{ route('logout') }}" method="POST" class="m-0 p-0">
                 @csrf
@@ -252,6 +252,7 @@
         customer_phone: '', is_walk_in: 1, order_notes: ''
     };
     let currentCat = '';
+    let isComplimentaryMode = false;
     let isWaiter = @json(auth()->user()->hasRole('waiter'));
 
     function updatePosSessionTimer() {
@@ -544,14 +545,38 @@
         payload.food_id = foodId;
         payload.addons = addons;
         payload.qty = 1;
+        payload.is_complimentary = isComplimentaryMode ? 1 : 0;
         $.post("{{ route('pos.cart.add') }}", payload, function(res) {
             if(res.status === 'success') loadCart();
         });
     }
 
-    function loadCart() {
+    function loadCart(preserveScroll = false) {
+        let $cartBody = $('#posCartBody');
+        let $cartItems = $('#posCartItems');
+
+        let cartBodyScrollTop = preserveScroll ? ($cartBody.scrollTop() || 0) : 0;
+        let cartItemsScrollTop = preserveScroll ? ($cartItems.scrollTop() || 0) : 0;
+        let windowScrollTop = preserveScroll ? ($(window).scrollTop() || 0) : 0;
+
+        function restoreCartScrollPosition() {
+            if(!preserveScroll) return;
+
+            $('#posCartBody').scrollTop(cartBodyScrollTop);
+            $('#posCartItems').scrollTop(cartItemsScrollTop);
+            $(window).scrollTop(windowScrollTop);
+        }
+
         $.get("{{ route('pos.cart.get') }}", getCartParams(), function(res) {
             $('#posCartBody').html(res);
+
+            // Quantity update/remove এর পর cart list যেন auto-scroll হয়ে উপরে না যায়
+            // DOM replace হওয়ার পর browser কখনও delayed scroll করে, তাই কয়েকবার restore করা হলো
+            restoreCartScrollPosition();
+            requestAnimationFrame(restoreCartScrollPosition);
+            setTimeout(restoreCartScrollPosition, 0);
+            setTimeout(restoreCartScrollPosition, 80);
+
             // নতুন লাইন: কার্ট লোড হওয়ার পর বাটন টেক্সট আপডেট
             if(isWaiter) {
                 $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Front Desk');
@@ -614,7 +639,7 @@
     window.removeCartItem = function(cartId) {
         let payload = getCartParams();
         payload.cart_id = cartId;
-        $.post("{{ route('pos.cart.remove') }}", payload, function() { loadCart(); });
+        $.post("{{ route('pos.cart.remove') }}", payload, function() { loadCart(true); });
     }
 
     window.updateQty = function(cartId, action) {
@@ -622,7 +647,43 @@
         payload.cart_id = cartId;
         payload.action = action;
         $.post("{{ route('pos.cart.update') }}", payload, function(res) {
-            if(res.status === 'success') loadCart();
+            if(res.status === 'success') loadCart(true);
+        });
+    }
+
+    let cartQtyUpdateTimers = {};
+    let cartQtyUpdateXhr = {};
+
+    window.scheduleCartQtyUpdate = function(cartId, qty, el) {
+        clearTimeout(cartQtyUpdateTimers[cartId]);
+
+        cartQtyUpdateTimers[cartId] = setTimeout(function() {
+            window.setCartQty(cartId, qty, el);
+        }, 250);
+    }
+
+    window.setCartQty = function(cartId, qty, el) {
+        qty = parseInt(qty) || 0;
+
+        if(el) {
+            $(el).prop('disabled', true);
+        }
+
+        let payload = getCartParams();
+        payload.cart_id = cartId;
+        payload.action = 'set';
+        payload.qty = qty;
+
+        if(cartQtyUpdateXhr[cartId] && cartQtyUpdateXhr[cartId].readyState !== 4) {
+            cartQtyUpdateXhr[cartId].abort();
+        }
+
+        cartQtyUpdateXhr[cartId] = $.post("{{ route('pos.cart.update') }}", payload, function(res) {
+            if(res.status === 'success') loadCart(true);
+        }).always(function() {
+            if(el) {
+                $(el).prop('disabled', false);
+            }
         });
     }
 
@@ -825,6 +886,117 @@
         });
     });
 
+    window.openOrderItemDeleteModal = function(orderId, orderDetailId, itemName, maxQty) {
+        $('#deleteOrderId').val(orderId);
+        $('#deleteOrderDetailId').val(orderDetailId);
+        $('#deleteOrderItemName').text(itemName);
+        $('#deleteOrderItemMaxQty').text(maxQty);
+        $('#deleteOrderItemQty').attr('max', maxQty).val(1);
+        $('#deleteOrderItemReason').val('');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('orderItemDeleteModal')).show();
+    }
+
+    $(document).on('click', '#btnDeleteFullQty', function() {
+        $('#deleteOrderItemQty').val($('#deleteOrderItemQty').attr('max') || 1);
+    });
+
+    $(document).on('submit', '#orderItemDeleteForm', function(e) {
+        e.preventDefault();
+
+        let qty = parseInt($('#deleteOrderItemQty').val()) || 0;
+        let maxQty = parseInt($('#deleteOrderItemQty').attr('max')) || 0;
+
+        if(qty < 1 || qty > maxQty) {
+            Swal.fire('Invalid Quantity', 'Please enter a quantity between 1 and ' + maxQty + '.', 'warning');
+            return;
+        }
+
+        let btn = $('#btnConfirmOrderItemDelete');
+        let originalHtml = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Deleting...');
+
+        $.ajax({
+            url: "{{ route('pos.order_item.remove') }}",
+            type: "POST",
+            data: $(this).serialize() + '&_token=' + $('meta[name="csrf-token"]').attr('content'),
+            success: function(res) {
+                btn.prop('disabled', false).html(originalHtml);
+
+                if(res.status === 'success') {
+                    bootstrap.Modal.getInstance(document.getElementById('orderItemDeleteModal'))?.hide();
+                    Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1200, showConfirmButton: false });
+
+                    let tableId = currentOrder.table_id || $('#btnContinueOrdering').data('table-id');
+                    if(tableId) {
+                        $.get("{{ route('pos.get_table_order', ':id') }}".replace(':id', tableId), function(html) {
+                            if(typeof html === 'object' && html.status === 'error') {
+                                location.reload();
+                            } else {
+                                $('#ocBody').html(html);
+                            }
+                        });
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    Swal.fire('Error', res.message || 'Could not delete item.', 'error');
+                }
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false).html(originalHtml);
+                let msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Server error. Please try again.';
+                Swal.fire('Error', msg, 'error');
+            }
+        });
+    });
+
+    $(document).on('click', '#btnAddComplimentary', function() {
+        const tId = $(this).data('table-id');
+        const orderId = $(this).data('order-id');
+        const waiterId = $(this).data('waiter-id');
+        const waiterName = $(this).data('waiter-name');
+        const customerId = $(this).data('customer-id');
+        const customerName = $(this).data('customer-name');
+        const tNum = $('#ocTableNum').text();
+
+        currentOrder.table_id = tId;
+        currentOrder.table_name = tNum;
+        currentOrder.order_id = orderId;
+        currentOrder.order_type = 'dine_in';
+        currentOrder.waiter_id = waiterId ? waiterId : null;
+        currentOrder.waiter_name = waiterName ? waiterName : '';
+
+        if(customerId) {
+            currentOrder.is_walk_in = 0;
+            currentOrder.customer_id = customerId;
+            currentOrder.customer_name = customerName;
+        } else {
+            currentOrder.is_walk_in = 1;
+            currentOrder.customer_id = null;
+            currentOrder.customer_name = '';
+        }
+
+        isComplimentaryMode = true;
+
+        var ocElement = document.getElementById('tableOrderOffcanvas');
+        if (ocElement) {
+            var ocInstance = bootstrap.Offcanvas.getInstance(ocElement);
+            if (ocInstance) ocInstance.hide();
+        }
+
+        showStep(2);
+        loadCart();
+        if(window.Swal) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Complimentary Mode On',
+                text: 'Now select food items. They will be added with 0 value.',
+                timer: 1600,
+                showConfirmButton: false
+            });
+        }
+    });
+
     $(document).on('click', '#btnContinueOrdering', function() {
         const tId = $(this).data('table-id');
         const orderId = $(this).data('order-id');
@@ -839,6 +1011,7 @@
         currentOrder.table_name = tNum;
         currentOrder.order_id = orderId;
         currentOrder.order_type = 'dine_in';
+        isComplimentaryMode = false;
 
         currentOrder.waiter_id = waiterId ? waiterId : null;
         currentOrder.waiter_name = waiterName ? waiterName : '';

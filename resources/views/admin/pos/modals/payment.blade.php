@@ -198,7 +198,11 @@ window.updateDueAmount = function() {
     }
 
     let due = Math.round(grand - totalPaid);
-    if(due < 0) due = 0;
+    let tips = 0;
+    if(due < 0) {
+        tips = Math.abs(due);
+        due = 0;
+    }
 
     $('#payDueAmount').text('৳' + due);
 };

@@ -6,6 +6,8 @@
         <th>Customer</th>
         <th>Items</th>
         <th>Total</th>
+        <th>Discount Amount</th>
+        <th>Tips</th>
         <th>Payment</th>
         <th>Status</th>
         <th>Time</th>
@@ -51,7 +53,15 @@
                 @endif
               </div>
             </td>
-            <td><strong>৳{{ number_format($order->grand_total, 2) }}</strong></td>
+            <td><strong>৳{{ number_format($order->grand_total, 0) }}</strong></td>
+            <td>
+              @php $discountAmount = max(0, (float)($order->discount_amount ?? 0)); @endphp
+              <strong class="text-danger">৳{{ number_format($discountAmount, 0) }}</strong>
+            </td>
+            <td>
+              @php $tipsAmount = max(0, (float)($order->tips_amount ?? ((float)($order->total_paid_amount ?? 0) - (float)($order->grand_total ?? 0)))); @endphp
+              <strong class="text-success">৳{{ number_format($tipsAmount, 0) }}</strong>
+            </td>
             <td>
               <span class="progga-badge progga-badge-neutral">
                 <i class="bi {{ $order->payment_type == 'Cash' ? 'bi-cash' : ($order->payment_type == 'Card' ? 'bi-credit-card' : 'bi-phone') }}"></i>
@@ -85,6 +95,13 @@
         <i class="bi bi-card-list"></i>
     </a>
 
+    <button class="progga-btn progga-btn-outline progga-btn-icon progga-btn-sm"
+            title="Delete History"
+            onclick="viewDeleteHistory({{ $order->id }})"
+            style="color: #6f42c1; border-color: #6f42c1;">
+        <i class="bi bi-clock-history"></i>
+    </button>
+
     @can('order-delete')
         <button type="button"
                 class="progga-btn progga-btn-outline progga-btn-icon progga-btn-sm"
@@ -98,7 +115,7 @@
 </td>
           </tr>
       @empty
-          <tr><td colspan="9" class="text-center py-4">No orders found.</td></tr>
+          <tr><td colspan="11" class="text-center py-4">No orders found.</td></tr>
       @endforelse
     </tbody>
   </table>
