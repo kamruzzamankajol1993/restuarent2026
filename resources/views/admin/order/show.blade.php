@@ -44,6 +44,10 @@
                 <h5 class="mb-3" style="font-weight: 800; color: var(--progga-primary);"><i class="bi bi-credit-card me-2"></i> Payment Info</h5>
                 <p class="mb-2" style="font-size: 14px;"><strong>Method:</strong> <span class="badge bg-secondary px-2 py-1">{{ $order->payment_type }}</span></p>
                 <p class="mb-2" style="font-size: 14px;"><strong>Trx ID:</strong> {{ $order->transaction_id ?? 'N/A' }}</p>
+                <p class="mb-2" style="font-size: 14px;"><strong>Total Paid:</strong> ৳{{ number_format($order->total_paid_amount ?? 0, 0) }}</p>
+                <p class="mb-2" style="font-size: 14px;"><strong>Tips:</strong> ৳{{ number_format($order->tips_amount ?? 0, 0) }}</p>
+                <p class="mb-2" style="font-size: 14px;"><strong>Given Money:</strong> ৳{{ number_format($order->given_money ?? 0, 0) }}</p>
+                <p class="mb-2" style="font-size: 14px;"><strong>Change:</strong> ৳{{ number_format($order->change_amount ?? 0, 0) }}</p>
                 <p class="mb-2" style="font-size: 14px;"><strong>Payment Status:</strong>
                     @if($order->due > 0)
                         <span class="badge bg-danger px-2 py-1">Due/Partial</span>
@@ -161,6 +165,18 @@
                         <tr>
                             <td class="text-end fw-bold text-success pt-3">Total Paid Amount:</td>
                             <td class="text-end text-success fw-bold pt-3">৳{{ number_format($order->total_paid_amount, 0) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end fw-bold text-success">Tips:</td>
+                            <td class="text-end text-success fw-bold">৳{{ number_format($order->tips_amount ?? 0, 0) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end fw-bold">Given Money:</td>
+                            <td class="text-end fw-bold">৳{{ number_format($order->given_money ?? 0, 0) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end fw-bold text-success">Change:</td>
+                            <td class="text-end text-success fw-bold">৳{{ number_format($order->change_amount ?? 0, 0) }}</td>
                         </tr>
                         <tr>
                             <td class="text-end fw-bold text-danger">Due Amount:</td>

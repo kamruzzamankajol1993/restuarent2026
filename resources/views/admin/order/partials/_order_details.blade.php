@@ -97,6 +97,23 @@
         <div class="progga-order-summary-row grand">
           <span>TOTAL</span><span>৳{{ number_format($order->grand_total, 0) }}</span>
         </div>
+        <div class="progga-order-summary-row text-success">
+          <span>Total Paid</span><span>৳{{ number_format($order->total_paid_amount ?? 0, 0) }}</span>
+        </div>
+        <div class="progga-order-summary-row text-success">
+          <span>Tips</span><span>৳{{ number_format($order->tips_amount ?? 0, 0) }}</span>
+        </div>
+        <div class="progga-order-summary-row">
+          <span>Given Money</span><span>৳{{ number_format($order->given_money ?? 0, 0) }}</span>
+        </div>
+        <div class="progga-order-summary-row text-success">
+          <span>Change</span><span>৳{{ number_format($order->change_amount ?? 0, 0) }}</span>
+        </div>
+        @if(($order->due ?? 0) > 0)
+        <div class="progga-order-summary-row text-danger">
+          <span>Due</span><span>৳{{ number_format($order->due, 0) }}</span>
+        </div>
+        @endif
       </div>
       <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
         <span class="progga-badge progga-badge-neutral" style="font-size:12px;padding:6px 12px;"><i class="bi bi-cash me-1"></i> Paid by {{ $order->payment_type }}</span>

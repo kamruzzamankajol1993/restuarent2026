@@ -249,7 +249,7 @@
     let currentOrder = {
         order_type: 'dine_in', table_id: null, table_name: '',
         waiter_id: null, waiter_name: '', customer_id: null, customer_name: '',
-        customer_phone: '', is_walk_in: 1, order_notes: ''
+        customer_phone: '', is_walk_in: 1, order_notes: '', is_complimentary_order: 0
     };
     let currentCat = '';
     let isComplimentaryMode = false;
@@ -299,10 +299,16 @@
 
 
     let newOrderModalMode = 'all';
+    // Start Order বাটন দিয়ে modal hide করলে current order state reset করা যাবে না।
+    // কিন্তু close/cancel করলে modal এবং selected table clean করা হবে।
+    let newOrderStartedFromModal = false;
 
     function resetNewOrderModalCommon() {
         $('#posWalkIn').prop('checked', true).trigger('change');
         $('#order_notes').val('');
+        $('#posComplimentaryOrder').prop('checked', false);
+        currentOrder.is_complimentary_order = 0;
+        isComplimentaryMode = false;
         $('#newCustomerForm').hide();
         $('#customerSearchContainer').show();
         $('#new_cus_name, #new_cus_phone').val('');
@@ -319,12 +325,45 @@
         $('#labelDineIn, #labelTakeaway, #labelDelivery').show();
         $('#posTypeDineIn, #posTypeTakeaway, #posTypeDelivery').prop('disabled', false);
         $('#posTypeDineIn').prop('checked', true);
-        $('#modalTableSelect').val('');
+        $('#posTypeTakeaway, #posTypeDelivery').prop('checked', false);
+        $('#modalTableSelect').val('').trigger('change');
+        $('#modalSelectedTableNum').text('T-00');
         $('#modalTableSelectSection').show();
         $('#modalTableDisplaySection').hide();
         resetNewOrderModalCommon();
         bootstrap.Modal.getOrCreateInstance(document.getElementById('newOrderModal')).show();
     }
+
+    function resetNewOrderModalAfterClose() {
+        newOrderModalMode = 'all';
+        currentOrder.table_id = null;
+        currentOrder.table_name = '';
+        currentOrder.order_type = 'dine_in';
+        currentOrder.order_id = null;
+
+        $('#labelDineIn, #labelTakeaway, #labelDelivery').show();
+        $('#posTypeDineIn, #posTypeTakeaway, #posTypeDelivery').prop('disabled', false);
+        $('#posTypeDineIn').prop('checked', true);
+        $('#posTypeTakeaway, #posTypeDelivery').prop('checked', false);
+
+        // Modal close করলে select value এবং UI দুইটাই reset হবে।
+        $('#modalTableSelect').val('').trigger('change');
+        $('#modalSelectedTableNum').text('T-00');
+        $('#modalTableSelectSection').show();
+        $('#modalTableDisplaySection').hide();
+
+        resetNewOrderModalCommon();
+    }
+
+    $('#newOrderModal').on('hidden.bs.modal', function () {
+        // Start Order দিয়ে hide হলে reset করা যাবে না, কারণ এরপর POS Step-2 currentOrder ব্যবহার করে।
+        if (newOrderStartedFromModal) {
+            newOrderStartedFromModal = false;
+            return;
+        }
+
+        resetNewOrderModalAfterClose();
+    });
 
     function openDineInTableModal(tableId, tableName) {
         newOrderModalMode = 'table';
@@ -368,6 +407,10 @@
             let waiterText = currentOrder.waiter_id ? currentOrder.waiter_name : 'Unassigned';
             $('#metaWaiter').html('<i class="bi bi-person-badge"></i> ' + waiterText);
 
+            if(currentOrder.is_complimentary_order === 1) {
+                $('#posSelectedTableMeta').append(' <span class="badge bg-success ms-1" style="font-size:10px;">Complimentary</span>');
+            }
+
             loadFoods('');
             loadCart();
         }
@@ -408,7 +451,7 @@
         if(type === 'takeaway' || type === 'delivery') {
             $('#modalTableSelectSection').slideUp();
             $('#modalTableDisplaySection').slideUp();
-            $('#modalTableSelect').val('');
+            $('#modalTableSelect').val('').trigger('change');
             currentOrder.table_id = null;
             currentOrder.table_name = type === 'takeaway' ? 'Takeaway' : 'Delivery';
         } else {
@@ -479,6 +522,8 @@
         currentOrder.waiter_name = currentOrder.waiter_id ? $('#posWaiterSelect option:selected').text() : 'Unassigned';
         currentOrder.is_walk_in = $('#posWalkIn').is(':checked') ? 1 : 0;
         currentOrder.order_notes = $('#order_notes').val() || '';
+        currentOrder.is_complimentary_order = $('#posComplimentaryOrder').is(':checked') ? 1 : 0;
+        isComplimentaryMode = currentOrder.is_complimentary_order === 1;
 
         if(currentOrder.is_walk_in === 0) {
             currentOrder.customer_id = $('#posCustomerSelect').val();
@@ -496,6 +541,7 @@
             currentOrder.customer_id = null;
         }
 
+        newOrderStartedFromModal = true;
         bootstrap.Modal.getInstance(document.getElementById('newOrderModal')).hide();
         showStep(2);
     });
@@ -598,6 +644,8 @@
         currentOrder.customer_phone = data.customer_phone || '';
         currentOrder.is_walk_in = parseInt(typeof data.is_walk_in !== 'undefined' ? data.is_walk_in : (data.customer_id ? 0 : 1));
         currentOrder.order_notes = data.notes || '';
+        currentOrder.is_complimentary_order = 0;
+        isComplimentaryMode = false;
 
         let tableCard = $('.progga-pos-table-card[data-table-id="' + currentOrder.table_id + '"]');
         if(tableCard.length) {
@@ -740,6 +788,7 @@
                     customer_name: currentOrder.customer_name,
                     customer_phone: currentOrder.customer_phone,
                     order_notes: currentOrder.order_notes,
+                    is_complimentary_order: currentOrder.is_complimentary_order || 0,
                     discount_type: discType,
                     discount_value: discVal,
                     preparation_time: $('#cart_prep_time').val() || 20,
@@ -786,12 +835,78 @@
         });
     });
 
+    function posPaymentNumber(value) {
+        return parseFloat(String(value || 0).replace(/[^0-9.-]/g, '')) || 0;
+    }
+
+    function posMoney(value) {
+        return Math.round(posPaymentNumber(value));
+    }
+
+    window.syncFinalPaymentFields = function() {
+        let method = $('input[name="payment_method"]:checked').val() || 'Cash';
+        let isSplit = method === 'Split';
+        let isMobileBanking = method === 'Mobile Banking';
+
+        $('#normalPaidRow').css('display', isSplit ? 'none' : 'flex');
+        $('#splitPaidDisplayRow').css('display', isSplit ? 'flex' : 'none');
+        $('#splitPaymentDiv').toggle(isSplit);
+        $('#payTotalPaidAmount').prop('disabled', isSplit);
+        $('#splitCash, #splitCard, #splitMfc').prop('disabled', !isSplit);
+
+        $('#transactionDiv').toggle(isMobileBanking);
+        $('#transactionDiv').find('input[name="transaction_id"]').prop('disabled', !isMobileBanking);
+    };
+
+    window.getFinalPaymentBillPaid = function() {
+        let method = $('input[name="payment_method"]:checked').val() || 'Cash';
+
+        if (method === 'Split') {
+            let cash = posPaymentNumber($('#splitCash').val());
+            let card = posPaymentNumber($('#splitCard').val());
+            let mfc = posPaymentNumber($('#splitMfc').val());
+            let splitTotal = cash + card + mfc;
+            $('#payTotalPaidAmount').val(splitTotal.toFixed(2));
+            $('#payPaidDisplay').text('৳' + posMoney(splitTotal));
+            return splitTotal;
+        }
+
+        return posPaymentNumber($('#payTotalPaidAmount').val());
+    };
+
+    window.updateDueAmount = function() {
+        let grand = posPaymentNumber($('#payTotalAmount').text());
+        let paid = window.getFinalPaymentBillPaid();
+        let tips = posPaymentNumber($('#payTipsAmount').val());
+        let givenMoney = posPaymentNumber($('#payGivenMoney').val());
+
+        let due = Math.max(0, grand - paid);
+        let changeAmount = Math.max(0, givenMoney - paid - tips);
+
+        $('#payDueAmount').text('৳' + posMoney(due));
+        $('#payChangeAmount').val(posMoney(changeAmount));
+    };
+
+    window.resetFinalPaymentDefaults = function(grand) {
+        grand = posMoney(grand);
+        $('#payCash').prop('checked', true);
+        $('#splitCash, #splitCard, #splitMfc').val(0);
+        $('#payTotalPaidAmount').prop('disabled', false).val(grand);
+        $('#payTipsAmount').val(0);
+        $('#payGivenMoney').val(grand);
+        $('#payChangeAmount').val(0);
+        $('#transactionDiv').find('input[name="transaction_id"]').val('');
+        window.syncFinalPaymentFields();
+        window.updateDueAmount();
+    };
+
     window.openPaymentModal = function(data) {
         let oc = document.getElementById('tableOrderOffcanvas');
         if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
 
         $('#payOrderId').val(data.order_id || '');
         $('#payOrderType').val(data.order_type || 'takeaway');
+        $('#payIsComplimentaryOrder').val(data.is_complimentary_order ? 1 : 0);
 
         let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
         $('#payTableLabel').text(data.table_no || defaultLabel);
@@ -817,6 +932,7 @@
         $('#payModalItemsArea').html(itemsHtml);
 
         calculateModalTotal();
+        window.resetFinalPaymentDefaults(posPaymentNumber($('#payTotalAmount').text()));
         bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
     }
 
@@ -834,7 +950,7 @@
         let vat = Math.round(((subtotal + service) * vat_rate) / 100);
         let discount_amount = Math.round((disc_type === 'percentage') ? (subtotal * disc_val / 100) : disc_val);
 
-        let grand = Math.round((subtotal + vat + service) - discount_amount);
+        let grand = Math.max(0, Math.round((subtotal + vat + service) - discount_amount));
 
         $('#payDiscount').text('−৳' + discount_amount);
         $('#payVat').text('৳' + vat);
@@ -849,12 +965,29 @@
 
         if ($('input[name="payment_method"]:checked').val() !== 'Split') {
             $('#payTotalPaidAmount').val(grand);
+            if (posPaymentNumber($('#payGivenMoney').val()) === 0) {
+                $('#payGivenMoney').val(grand);
+            }
         }
 
+        if(typeof window.syncFinalPaymentFields === 'function') {
+            window.syncFinalPaymentFields();
+        }
         if(typeof window.updateDueAmount === 'function') {
             window.updateDueAmount();
         }
     }
+
+    $(document).on('keyup change', '#payTotalPaidAmount, #payTipsAmount, #payGivenMoney, .split-input', window.updateDueAmount);
+
+    $(document).on('change', 'input[name="payment_method"]', function() {
+        let grand = posMoney($('#payTotalAmount').text());
+        if ($(this).val() !== 'Split') {
+            $('#payTotalPaidAmount').val(grand);
+        }
+        window.syncFinalPaymentFields();
+        window.updateDueAmount();
+    });
 
     $(document).on('submit', '#payForm', function(e) {
         e.preventDefault();
@@ -863,6 +996,8 @@
         let originalHtml = btn.html();
         btn.html('<i class="spinner-border spinner-border-sm"></i> Processing...').prop('disabled', true);
 
+        window.syncFinalPaymentFields();
+        window.updateDueAmount();
         let formData = $(this).serialize();
 
         $.ajax({
@@ -976,6 +1111,7 @@
             currentOrder.customer_name = '';
         }
 
+        currentOrder.is_complimentary_order = 0;
         isComplimentaryMode = true;
 
         var ocElement = document.getElementById('tableOrderOffcanvas');
@@ -1011,6 +1147,7 @@
         currentOrder.table_name = tNum;
         currentOrder.order_id = orderId;
         currentOrder.order_type = 'dine_in';
+        currentOrder.is_complimentary_order = 0;
         isComplimentaryMode = false;
 
         currentOrder.waiter_id = waiterId ? waiterId : null;

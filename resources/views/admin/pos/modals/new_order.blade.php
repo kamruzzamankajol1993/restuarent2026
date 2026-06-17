@@ -108,6 +108,19 @@
               </div>
             </div>
 
+            <div class="pos-modal-section" style="margin-top:14px;">
+              <div class="pos-walkin-row" style="border: 1px dashed #198754; background: rgba(25, 135, 84, 0.06);">
+                <div class="pos-walkin-row-text">
+                  <strong><i class="bi bi-gift-fill text-success me-1"></i>Complimentary Order</strong>
+                  <small>On করলে এই order-এর সব food/addon price 0 হবে।</small>
+                </div>
+                <label class="progga-toggle">
+                  <input type="checkbox" id="posComplimentaryOrder" name="is_complimentary_order" value="1">
+                  <span class="progga-toggle-track"><span class="progga-toggle-thumb"></span></span>
+                </label>
+              </div>
+            </div>
+
             <div class="pos-modal-section">
               <div class="pos-modal-label">Notes</div>
               <textarea id="order_notes" name="order_notes" class="progga-form-control" rows="2" placeholder="Optional notes..."></textarea>

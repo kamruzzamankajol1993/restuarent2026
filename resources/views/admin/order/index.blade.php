@@ -123,6 +123,9 @@
     <button type="button" onclick="exportOrderPDF()" class="progga-btn progga-btn-outline progga-btn-sm">
         <i class="bi bi-file-earmark-pdf"></i> Export PDF
     </button>
+    <button type="button" onclick="exportOrderExcel()" class="progga-btn progga-btn-outline progga-btn-sm" style="border-color:#198754;color:#198754;background:#f8fff9;">
+        <i class="bi bi-file-earmark-excel"></i> Export Excel
+    </button>
     <a href="{{ route('pos.index') }}" class="progga-btn progga-btn-primary progga-btn-sm"><i class="bi bi-display"></i> Open POS</a>
 </div>
   </div>
@@ -197,6 +200,7 @@
           <option value="Cash">Cash</option>
           <option value="Card">Card</option>
           <option value="Mobile Banking">Mobile Banking</option>
+          <option value="Split">Split</option>
         </select>
       </div>
     </div>
@@ -334,19 +338,27 @@
     });
 };
 
-   function exportOrderPDF() {
+   // PDF এবং Excel export একই current filter ব্যবহার করবে।
+   function buildOrderExportQueryString() {
         let search = $('#searchOrder').val() || '';
         let status = $('#filterStatus').val() || '';
         let date = $('#filterDate').val() || '';
+        let payment = $('#filterPayment').val() || '';
 
-        // ফিল্টার ভ্যালুসহ ইউআরএল তৈরি
-        let url = "{{ route('order.export_pdf') }}?" +
-                  "search=" + encodeURIComponent(search) +
-                  "&status=" + encodeURIComponent(status) +
-                  "&date_range=" + encodeURIComponent(date);
+        return "search=" + encodeURIComponent(search) +
+               "&status=" + encodeURIComponent(status) +
+               "&date_range=" + encodeURIComponent(date) +
+               "&payment=" + encodeURIComponent(payment);
+    }
 
-        // নতুন ট্যাবে পিডিএফ ওপেন করা
-        window.open(url, '_blank');
+   function exportOrderPDF() {
+        // নতুন ট্যাবে filtered PDF ওপেন করা।
+        window.open("{{ route('order.export_pdf') }}?" + buildOrderExportQueryString(), '_blank');
+    }
+
+   function exportOrderExcel() {
+        // একই filtered data Excel file হিসেবে download হবে।
+        window.location.href = "{{ route('order.export_excel') }}?" + buildOrderExportQueryString();
     }
 </script>
 @endsection

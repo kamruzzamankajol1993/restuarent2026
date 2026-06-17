@@ -37,13 +37,6 @@
                 <span>GRAND TOTAL</span><span id="payTotalAmount">৳0</span>
               </div>
 
-              <div class="progga-pos-total-row mt-2" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; color: #333;">
-                <span>Total Paid</span>
-                <input type="number" id="payTotalPaidAmount" name="total_paid_amount" form="payForm" class="form-control form-control-sm text-end" style="width: 120px; font-weight:bold; border: 1.5px solid var(--progga-border);" value="0">
-              </div>
-              <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 900; color: #d33; margin-top: 6px;">
-                <span>DUE AMOUNT</span><span id="payDueAmount">৳0</span>
-              </div>
 
             </div>
           </div>
@@ -52,6 +45,7 @@
             <form class="progga-pay-form" id="payForm">
               <input type="hidden" id="payOrderId" name="order_id">
               <input type="hidden" id="payOrderType" name="order_type">
+              <input type="hidden" id="payIsComplimentaryOrder" name="is_complimentary_order" value="0">
               <div class="row mb-3">
                 <div class="col-6">
                     <label style="font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px;">Discount Type</label>
@@ -101,15 +95,15 @@
                   <div class="row g-2">
                       <div class="col-4">
                           <label style="font-size: 11px; font-weight: 700; color: #555;">Cash</label>
-                          <input type="number" name="paid_in_cash" id="splitCash" class="form-control split-input p-1 text-center" value="0">
+                          <input type="number" name="paid_in_cash" id="splitCash" class="form-control split-input p-1 text-center" value="0" min="0" step="0.01">
                       </div>
                       <div class="col-4">
                           <label style="font-size: 11px; font-weight: 700; color: #555;">Card</label>
-                          <input type="number" name="paid_in_card" id="splitCard" class="form-control split-input p-1 text-center" value="0">
+                          <input type="number" name="paid_in_card" id="splitCard" class="form-control split-input p-1 text-center" value="0" min="0" step="0.01">
                       </div>
                       <div class="col-4">
                           <label style="font-size: 11px; font-weight: 700; color: #555;">MFC (Mobile)</label>
-                          <input type="number" name="paid_in_mfc" id="splitMfc" class="form-control split-input p-1 text-center" value="0">
+                          <input type="number" name="paid_in_mfc" id="splitMfc" class="form-control split-input p-1 text-center" value="0" min="0" step="0.01">
                       </div>
                   </div>
               </div>
@@ -117,6 +111,40 @@
               <div class="progga-pm-ref" id="transactionDiv" style="display: none; margin-bottom: 15px;">
                   <label style="font-size: 12px; font-weight: 700; color: #555;">Transaction / Reference No</label>
                   <input type="text" name="transaction_id" class="form-control" placeholder="e.g. TXN-8473920" style="border: 1.5px solid var(--progga-border); border-radius: 8px;">
+              </div>
+
+              <div class="progga-form-label" style="font-weight:700; margin:16px 0 10px; font-size: 14px; color: var(--progga-primary);">
+                Payment Amount
+              </div>
+
+              <div style="background:#fff; border:1px solid var(--progga-border-light); border-radius:10px; padding:12px; margin-bottom:14px;">
+                <div class="progga-pos-total-row" id="normalPaidRow" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; color: #333; margin-bottom:10px;">
+                  <span>Total Paid</span>
+                  <input type="number" id="payTotalPaidAmount" name="total_paid_amount" class="form-control form-control-sm text-end" style="width: 140px; font-weight:bold; border: 1.5px solid var(--progga-border);" value="0" min="0" step="0.01">
+                </div>
+
+                <div class="progga-pos-total-row" id="splitPaidDisplayRow" style="display: none; justify-content: space-between; font-size: 14px; font-weight: 800; color: #333; margin-bottom:10px;">
+                  <span>Split Total Paid</span><span id="payPaidDisplay">৳0</span>
+                </div>
+
+                <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; color: #333; margin-bottom:10px;">
+                  <span>Tips</span>
+                  <input type="number" id="payTipsAmount" name="tips_amount" class="form-control form-control-sm text-end" style="width: 140px; font-weight:bold; border: 1.5px solid var(--progga-border);" value="0" min="0" step="0.01">
+                </div>
+
+                <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; color: #333; margin-bottom:10px;">
+                  <span>Given Money</span>
+                  <input type="number" id="payGivenMoney" name="given_money" class="form-control form-control-sm text-end" style="width: 140px; font-weight:bold; border: 1.5px solid var(--progga-border);" value="0" min="0" step="0.01">
+                </div>
+
+                <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 900; color: #198754; margin-bottom:10px;">
+                  <span>CHANGE</span>
+                  <input type="number" id="payChangeAmount" name="change_amount" class="form-control form-control-sm text-end" style="width: 140px; font-weight:900; border: 1.5px solid #198754; color:#198754;" value="0" readonly>
+                </div>
+
+                <div class="progga-pos-total-row" style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 900; color: #d33; padding-top:10px; border-top:1px dashed var(--progga-border-light);">
+                  <span>DUE AMOUNT</span><span id="payDueAmount">৳0</span>
+                </div>
               </div>
 
               <div class="d-flex gap-2" style="margin-top:20px;">
@@ -145,18 +173,83 @@ input[type="radio"]:checked + .progga-pay-method-btn {
 </style>
 
 <script>
+function posPaymentNumber(value) {
+    return parseFloat(String(value || 0).replace(/[^0-9.-]/g, '')) || 0;
+}
+
+function posMoney(value) {
+    return Math.round(posPaymentNumber(value));
+}
+
+window.syncFinalPaymentFields = function() {
+    let method = $('input[name="payment_method"]:checked').val() || 'Cash';
+    let isSplit = method === 'Split';
+    let isMobileBanking = method === 'Mobile Banking';
+
+    $('#normalPaidRow').css('display', isSplit ? 'none' : 'flex');
+    $('#splitPaidDisplayRow').css('display', isSplit ? 'flex' : 'none');
+    $('#splitPaymentDiv').toggle(isSplit);
+    $('#payTotalPaidAmount').prop('disabled', isSplit);
+    $('#splitCash, #splitCard, #splitMfc').prop('disabled', !isSplit);
+
+    $('#transactionDiv').toggle(isMobileBanking);
+    $('#transactionDiv').find('input[name="transaction_id"]').prop('disabled', !isMobileBanking);
+};
+
+window.getFinalPaymentBillPaid = function() {
+    let method = $('input[name="payment_method"]:checked').val() || 'Cash';
+
+    if (method === 'Split') {
+        let cash = posPaymentNumber($('#splitCash').val());
+        let card = posPaymentNumber($('#splitCard').val());
+        let mfc = posPaymentNumber($('#splitMfc').val());
+        let splitTotal = cash + card + mfc;
+        $('#payTotalPaidAmount').val(splitTotal.toFixed(2));
+        $('#payPaidDisplay').text('৳' + posMoney(splitTotal));
+        return splitTotal;
+    }
+
+    return posPaymentNumber($('#payTotalPaidAmount').val());
+};
+
+window.updateDueAmount = function() {
+    let grand = posPaymentNumber($('#payTotalAmount').text());
+    let paid = window.getFinalPaymentBillPaid();
+    let tips = posPaymentNumber($('#payTipsAmount').val());
+    let givenMoney = posPaymentNumber($('#payGivenMoney').val());
+
+    let due = Math.max(0, grand - paid);
+    let changeAmount = Math.max(0, givenMoney - paid - tips);
+
+    $('#payDueAmount').text('৳' + posMoney(due));
+    $('#payChangeAmount').val(posMoney(changeAmount));
+};
+
+window.resetFinalPaymentDefaults = function(grand) {
+    grand = posMoney(grand);
+    $('#payCash').prop('checked', true);
+    $('#splitCash, #splitCard, #splitMfc').val(0);
+    $('#payTotalPaidAmount').prop('disabled', false).val(grand);
+    $('#payTipsAmount').val(0);
+    $('#payGivenMoney').val(grand);
+    $('#payChangeAmount').val(0);
+    $('#transactionDiv').find('input[name="transaction_id"]').val('');
+    window.syncFinalPaymentFields();
+    window.updateDueAmount();
+};
+
 window.openPaymentModal = function(data) {
     let oc = document.getElementById('tableOrderOffcanvas');
     if(oc) bootstrap.Offcanvas.getInstance(oc)?.hide();
 
     $('#payOrderId').val(data.order_id || '');
     $('#payOrderType').val(data.order_type || 'takeaway');
+    $('#payIsComplimentaryOrder').val(data.is_complimentary_order ? 1 : 0);
 
     let defaultLabel = data.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
     $('#payTableLabel').text(data.table_no || defaultLabel);
 
     $('#paymentModal').data('subtotal', parseFloat(data.subtotal || 0));
-
     $('#paySubtotal').text('৳' + Math.round(data.subtotal || 0));
 
     $('#modal_discount_type').val('fixed');
@@ -177,53 +270,18 @@ window.openPaymentModal = function(data) {
     $('#payModalItemsArea').html(itemsHtml);
 
     calculateModalTotal();
+    window.resetFinalPaymentDefaults(posPaymentNumber($('#payTotalAmount').text()));
     bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
 }
 
-window.updateDueAmount = function() {
-    let grand = parseFloat($('#payTotalAmount').text().replace('৳', '')) || 0;
-    let method = $('input[name="payment_method"]:checked').val();
-    let totalPaid = 0;
-
-    if (method === 'Split') {
-        let cash = parseFloat($('#splitCash').val()) || 0;
-        let card = parseFloat($('#splitCard').val()) || 0;
-        let mfc = parseFloat($('#splitMfc').val()) || 0;
-        totalPaid = cash + card + mfc;
-
-        $('#payTotalPaidAmount').val(totalPaid).prop('readonly', true);
-    } else {
-        $('#payTotalPaidAmount').prop('readonly', false);
-        totalPaid = parseFloat($('#payTotalPaidAmount').val()) || 0;
-    }
-
-    let due = Math.round(grand - totalPaid);
-    let tips = 0;
-    if(due < 0) {
-        tips = Math.abs(due);
-        due = 0;
-    }
-
-    $('#payDueAmount').text('৳' + due);
-};
-
-$(document).on('keyup change', '#payTotalPaidAmount, .split-input', window.updateDueAmount);
+$(document).on('keyup change', '#payTotalPaidAmount, #payTipsAmount, #payGivenMoney, .split-input', window.updateDueAmount);
 
 $(document).on('change', 'input[name="payment_method"]', function() {
-    let method = $(this).val();
-
-    if(method === 'Split') {
-        $('#splitPaymentDiv').slideDown('fast');
-        $('#transactionDiv').slideUp('fast');
-    } else if(method === 'Card' || method === 'Mobile Banking') {
-        $('#splitPaymentDiv').slideUp('fast');
-        $('#transactionDiv').slideDown('fast');
-        $('#payTotalPaidAmount').val(Math.round(parseFloat($('#payTotalAmount').text().replace('৳', ''))));
-    } else {
-        $('#splitPaymentDiv').slideUp('fast');
-        $('#transactionDiv').slideUp('fast');
-        $('#payTotalPaidAmount').val(Math.round(parseFloat($('#payTotalAmount').text().replace('৳', ''))));
+    let grand = posMoney($('#payTotalAmount').text());
+    if ($(this).val() !== 'Split') {
+        $('#payTotalPaidAmount').val(grand);
     }
+    window.syncFinalPaymentFields();
     window.updateDueAmount();
 });
 

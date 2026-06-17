@@ -187,7 +187,8 @@
             order_type: currentOrder.order_type,
             table_no: defaultLabel,
             subtotal: subtotal,
-            items: itemsArr
+            items: itemsArr,
+            is_complimentary_order: currentOrder.is_complimentary_order || 0
         });
     });
 </script>

@@ -279,6 +279,29 @@ public function printSessionReport($id)
         return 'pos_cart_table_' . $request->table_id;
     }
 
+    // ====================================================
+    // পুরো অর্ডার Complimentary হলে cart-এর সব item/addon price 0 করা হবে
+    // Existing offcanvas complimentary flow আলাদা থাকবে, এই helper শুধু new order complimentary flag পেলে কাজ করবে।
+    // ====================================================
+    private function makeCartComplimentary(array $cart): array
+    {
+        foreach ($cart as &$item) {
+            $item['price'] = 0;
+            $item['addon_total'] = 0;
+            $item['is_complimentary'] = true;
+
+            if (!empty($item['addons']) && is_array($item['addons'])) {
+                foreach ($item['addons'] as &$addon) {
+                    $addon['price'] = 0;
+                }
+                unset($addon);
+            }
+        }
+        unset($item);
+
+        return $cart;
+    }
+
     public function addToCart(Request $request)
 {
     $cartKey = $this->getCartKey($request);
@@ -398,6 +421,14 @@ public function placeOrder(Request $request)
             return response()->json(['status' => 'error', 'message' => 'Cart is empty!']);
         }
 
+        // New Order modal থেকে Complimentary Order select করলে cart-এর সব item free হবে।
+        // Offcanvas-এর Add Complimentary আগের মতো individual complimentary item হিসেবেই থাকবে।
+        $isComplimentaryOrder = $request->boolean('is_complimentary_order');
+        if ($isComplimentaryOrder) {
+            $cart = $this->makeCartComplimentary($cart);
+            Session::put($cartKey, $cart);
+        }
+
         DB::beginTransaction();
         try {
             // ইউজারের রোল অনুযায়ী স্ট্যাটাস নির্ধারণ
@@ -450,7 +481,7 @@ public function placeOrder(Request $request)
                         $customerId = null;
                     }
 
-                    $order->update([
+                    $orderUpdateData = [
                         'customer_id' => $customerId,
                         'waiter_id' => $request->waiter_id ?: $order->waiter_id,
                         'user_id' => $order->user_id ?: (auth()->id() ?? 1),
@@ -465,7 +496,13 @@ public function placeOrder(Request $request)
                         'status' => $newStatus,
                         'notes' => $request->order_notes ?? $order->notes,
                         'preparation_time' => $request->preparation_time ?? 20
-                    ]);
+                    ];
+
+                    if (Schema::hasColumn('orders', 'is_complimentary_order')) {
+                        $orderUpdateData['is_complimentary_order'] = $isComplimentaryOrder ? 1 : 0;
+                    }
+
+                    $order->update($orderUpdateData);
 
                     // ডুপ্লিকেট রোধে আগের Hold আইটেম মুছে ফেলা হলো
                     OrderDetail::where('order_id', $order->id)->delete();
@@ -502,7 +539,7 @@ public function placeOrder(Request $request)
                     $discount_amount = round(($discount_type == 'percentage') ? ($total_subtotal * $discount_value) / 100 : $discount_value);
                     $grand_total = round(($total_subtotal + $tax + $service_charge) - $discount_amount);
 
-                    $order->update([
+                    $orderUpdateData = [
                         'subtotal' => $total_subtotal,
                         'discount_amount' => $discount_amount,
                         'discount_type' => $discount_type,
@@ -512,7 +549,14 @@ public function placeOrder(Request $request)
                         'preparation_time' => $request->preparation_time ?? 20,
                         'due' => $grand_total,
                         'status' => $newStatus // ওয়েটার করলে Waiter_Hold, ফ্রন্ট ডেস্ক করলে Pending হবে
-                    ]);
+                    ];
+
+                    // Add More Food থেকে শুধু complimentary item add হলে পুরো পুরনো order complimentary করা হবে না।
+                    if (Schema::hasColumn('orders', 'is_complimentary_order') && $isComplimentaryOrder) {
+                        $orderUpdateData['is_complimentary_order'] = 1;
+                    }
+
+                    $order->update($orderUpdateData);
                 }
 
             } else {
@@ -534,7 +578,7 @@ public function placeOrder(Request $request)
                     }
                 }
 
-                $order = Order::create([
+                $orderCreateData = [
                     'customer_id' => $customerId,
                     'table_id' => ($request->order_type == 'takeaway' || $request->order_type == 'delivery') ? null : $request->table_id,
                     'waiter_id' => $request->waiter_id,
@@ -551,7 +595,13 @@ public function placeOrder(Request $request)
                     'notes' => $request->order_notes,
                     'order_time' => now(),
                     'preparation_time' => $request->preparation_time ?? 20
-                ]);
+                ];
+
+                if (Schema::hasColumn('orders', 'is_complimentary_order')) {
+                    $orderCreateData['is_complimentary_order'] = $isComplimentaryOrder ? 1 : 0;
+                }
+
+                $order = Order::create($orderCreateData);
 
                 if ($request->order_type == 'dine_in') {
                     Table::where('id', $request->table_id)->update(['initial_status' => 'Occupied']);
@@ -859,6 +909,7 @@ public function placeOrder(Request $request)
         try {
             $taxSetting = DB::table('tax_settings')->first();
             $vat_rate = $taxSetting->vat_rate ?? 0;
+            $isComplimentaryOrder = $request->boolean('is_complimentary_order');
 
             if ($request->filled('order_id')) {
                 $order = Order::findOrFail($request->order_id);
@@ -873,6 +924,11 @@ public function placeOrder(Request $request)
                     return response()->json(['status' => 'error', 'message' => 'Cart is empty!']);
                 }
 
+                if ($isComplimentaryOrder) {
+                    $cart = $this->makeCartComplimentary($cart);
+                    Session::put($cartKey, $cart);
+                }
+
                 $subtotal = 0;
                 foreach ($cart as $item) {
                     $subtotal += ($item['price'] + $item['addon_total']) * $item['qty'];
@@ -883,6 +939,9 @@ public function placeOrder(Request $request)
                 $order->subtotal = $subtotal;
                 $order->user_id = auth()->id() ?? 1;
                 $order->order_time = now();
+                if (Schema::hasColumn('orders', 'is_complimentary_order')) {
+                    $order->is_complimentary_order = $isComplimentaryOrder ? 1 : 0;
+                }
 
                 // অর্ডার নাম্বার আগে সেভ করতে হবে, যাতে OrderDetails এর জন্য Order ID পাওয়া যায়
                 $order->save();
@@ -922,17 +981,27 @@ public function placeOrder(Request $request)
             // পেমেন্ট স্প্লিট এবং Due ক্যালকুলেশন
             // ===============================================
             $paymentMethod = $request->payment_method;
-            $totalPaid = (float) ($request->total_paid_amount ?? 0);
-            $tipsAmount = max(0, round($totalPaid - $grand_total, 2));
 
-            // স্প্লিট পেমেন্ট হলে আলাদা ইনপুট থেকে ডাটা নিবে
-            $cash = ($paymentMethod == 'Split') ? ($request->paid_in_cash ?? 0) : (($paymentMethod == 'Cash') ? $totalPaid : 0);
-            $card = ($paymentMethod == 'Split') ? ($request->paid_in_card ?? 0) : (($paymentMethod == 'Card') ? $totalPaid : 0);
-            $mfc  = ($paymentMethod == 'Split') ? ($request->paid_in_mfc ?? 0)  : (($paymentMethod == 'Mobile Banking') ? $totalPaid : 0);
+            // Total Paid = শুধু bill payment. Tips/Given/Change আলাদা থাকবে।
+            // Split হলে Total Paid input ব্যবহার হবে না; Cash + Card + Mobile Banking sum হবে।
+            if ($paymentMethod == 'Split') {
+                $cash = max(0, (float) ($request->paid_in_cash ?? 0));
+                $card = max(0, (float) ($request->paid_in_card ?? 0));
+                $mfc  = max(0, (float) ($request->paid_in_mfc ?? 0));
+                $totalPaid = round($cash + $card + $mfc, 2);
+            } else {
+                $totalPaid = max(0, (float) ($request->total_paid_amount ?? 0));
+                $cash = ($paymentMethod == 'Cash') ? $totalPaid : 0;
+                $card = ($paymentMethod == 'Card') ? $totalPaid : 0;
+                $mfc  = ($paymentMethod == 'Mobile Banking') ? $totalPaid : 0;
+            }
 
-            // Due হিসাব করা হচ্ছে
-            $due = $grand_total - $totalPaid;
-            if($due < 0) $due = 0; // যদি কাস্টমার বেশি টাকা দেয়, তবে Due 0 থাকবে।
+            $tipsAmount = max(0, round((float) ($request->tips_amount ?? 0), 2));
+            $givenMoney = max(0, round((float) ($request->given_money ?? 0), 2));
+            $changeAmount = max(0, round($givenMoney - $totalPaid - $tipsAmount, 2));
+
+            // Due হিসাব করা হচ্ছে — tips/given money due কমাবে না, শুধু bill paid amount কমাবে।
+            $due = max(0, round($grand_total - $totalPaid, 2));
 
             // ===============================================
             // মডেলের মাস অ্যাসাইনমেন্ট রেসট্রিকশন এড়াতে সরাসরি প্রপার্টি সেট করে সেভ করা
@@ -943,16 +1012,25 @@ public function placeOrder(Request $request)
             $order->service_charge    = $service_charge;
             $order->grand_total       = $grand_total;
             $order->payment_type      = $paymentMethod;
-            $order->transaction_id    = $request->transaction_id;
+            $order->transaction_id    = $paymentMethod == 'Mobile Banking' ? $request->transaction_id : null;
             $order->status            = 'Completed'; // স্ট্যাটাস ১০০% আপডেট হবে
             $order->due               = $due;
             $order->total_paid_amount = $totalPaid;
             if (Schema::hasColumn('orders', 'tips_amount')) {
                 $order->tips_amount = $tipsAmount;
             }
+            if (Schema::hasColumn('orders', 'given_money')) {
+                $order->given_money = $givenMoney;
+            }
+            if (Schema::hasColumn('orders', 'change_amount')) {
+                $order->change_amount = $changeAmount;
+            }
             $order->paid_in_cash      = $cash;
             $order->paid_in_card      = $card;
             $order->paid_in_mfc       = $mfc;
+            if (Schema::hasColumn('orders', 'is_complimentary_order') && $isComplimentaryOrder) {
+                $order->is_complimentary_order = 1;
+            }
 
             // POS থেকে Kitchen-এ পাঠানো সময় থেকে Final Payment পর্যন্ত সময় মিনিটে সেভ হবে।
             if (Schema::hasColumn('orders', 'kitchen_to_payment_minutes')) {
@@ -1335,11 +1413,12 @@ public function placeOrder(Request $request)
         $order = Order::with(['orderDetails', 'customer', 'waiter', 'user'])->findOrFail($id);
         $restaurant = \App\Models\RestaurantSetting::first();
 
-        // Invoice/receipt must not show tips. Keep the saved payment untouched in DB,
-        // but cap any paid amount exposed to the invoice view at grand total.
-        $invoicePaidAmount = min((float) ($order->total_paid_amount ?? 0), (float) ($order->grand_total ?? 0));
-        $order->total_paid_amount = $invoicePaidAmount;
-        $order->invoice_paid_amount = $invoicePaidAmount;
+        // Final payment values are now stored separately:
+        // total_paid_amount = bill payment, tips_amount = tips, given_money = received money, change_amount = return amount.
+        $order->invoice_paid_amount = (float) ($order->total_paid_amount ?? 0);
+        $order->invoice_paid_in_cash = (float) ($order->paid_in_cash ?? 0);
+        $order->invoice_paid_in_card = (float) ($order->paid_in_card ?? 0);
+        $order->invoice_paid_in_mfc = (float) ($order->paid_in_mfc ?? 0);
 
         return view('admin.pos.invoice', compact('order', 'restaurant'));
     }

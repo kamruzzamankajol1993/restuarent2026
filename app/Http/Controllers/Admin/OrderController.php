@@ -8,10 +8,15 @@ use App\Models\Order;
 use Carbon\Carbon;
 use Mpdf\Mpdf;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use App\Models\OrderDetail;
 use App\Models\OrderKot;
 use App\Models\Table;
 use App\Models\PosDeletedItemHistory;
+use App\Exports\OrdersExport;
+use Maatwebsite\Excel\Facades\Excel;
+
 class OrderController extends Controller
 {
     public function index(Request $request)
@@ -26,34 +31,8 @@ class OrderController extends Controller
         ];
 
         // 2. Query Builder
-        $query = Order::with(['customer', 'table', 'orderDetails']);
-
-        // Filters
-        if ($request->search) {
-            $query->where(function($q) use ($request) {
-                $q->where('order_number', 'like', "%{$request->search}%")
-                  ->orWhereHas('customer', function($c) use ($request) {
-                      $c->where('name', 'like', "%{$request->search}%");
-                  });
-            });
-        }
-        if ($request->status) {
-            $query->where('status', $request->status);
-        }
-        if ($request->payment) {
-            $query->where('payment_type', $request->payment);
-        }
-        if ($request->date_range) {
-            if ($request->date_range == 'Today') {
-                $query->whereDate('created_at', Carbon::today());
-            } elseif ($request->date_range == 'Yesterday') {
-                $query->whereDate('created_at', Carbon::yesterday());
-            } elseif ($request->date_range == 'This Week') {
-                $query->whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
-            } elseif ($request->date_range == 'This Month') {
-                $query->whereMonth('created_at', Carbon::now()->month)->whereYear('created_at', Carbon::now()->year);
-            }
-        }
+        // একই filter logic Order List, PDF export এবং Excel export — তিন জায়গায় use হবে।
+        $query = $this->buildOrderReportQuery($request);
 
         $orders = $query->orderBy('id', 'desc')->paginate(10)->appends($request->query());
 
@@ -71,17 +50,35 @@ class OrderController extends Controller
         return view('admin.order.partials._order_details', compact('order'))->render();
     }
 
-    public function exportPDF(Request $request)
+    /**
+     * Order List/PDF/Excel export এর জন্য common filtered query.
+     * এখানে নতুন filter add করলে তিন জায়গায় একইভাবে কাজ করবে।
+     */
+    private function buildOrderReportQuery(Request $request)
     {
         $query = Order::with(['customer', 'table', 'orderDetails']);
 
-        // ফিল্টার লজিক
+        // Search: Order number অথবা customer name — Order List table এর মতোই।
         if ($request->search) {
-            $query->where('order_number', 'like', "%{$request->search}%");
+            $query->where(function ($q) use ($request) {
+                $q->where('order_number', 'like', "%{$request->search}%")
+                  ->orWhereHas('customer', function ($c) use ($request) {
+                      $c->where('name', 'like', "%{$request->search}%");
+                  });
+            });
         }
+
+        // Status filter
         if ($request->status) {
             $query->where('status', $request->status);
         }
+
+        // Payment filter — Cash/Card/Mobile Banking/Split সব support করবে।
+        if ($request->payment) {
+            $query->where('payment_type', $request->payment);
+        }
+
+        // Date range filter
         if ($request->date_range) {
             if ($request->date_range == 'Today') {
                 $query->whereDate('created_at', Carbon::today());
@@ -90,38 +87,56 @@ class OrderController extends Controller
             } elseif ($request->date_range == 'This Week') {
                 $query->whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
             } elseif ($request->date_range == 'This Month') {
-                $query->whereMonth('created_at', Carbon::now()->month)->whereYear('created_at', Carbon::now()->year);
+                $query->whereMonth('created_at', Carbon::now()->month)
+                      ->whereYear('created_at', Carbon::now()->year);
             }
         }
 
-        $orders = $query->orderBy('id', 'desc')->get();
+        return $query;
+    }
+
+ public function exportPDF(Request $request)
+    {
+        $orders = $this->buildOrderReportQuery($request)->orderBy('id', 'desc')->get();
         $restaurant = \App\Models\RestaurantSetting::first();
 
-        // ব্লেড ফাইল থেকে HTML রেন্ডার করা
+        // Blade file থেকে HTML render করা হচ্ছে
         $html = view('admin.order.pdf_report', compact('orders', 'restaurant'))->render();
 
-        // mPDF কনফিগারেশন এবং ইনিশিয়ালাইজেশন
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4',
-            'orientation' => 'P', // P for Portrait, L for Landscape
-            'margin_left' => 15,
-            'margin_right' => 15,
-            'margin_top' => 16,
-            'margin_bottom' => 16,
-            'margin_header' => 9,
-            'margin_footer' => 9
+            'orientation' => 'L',
+            'margin_left' => 8,
+            'margin_right' => 8,
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+            'margin_header' => 5,
+            'margin_footer' => 5,
         ]);
 
-        // ডকুমেন্টের টাইটেল সেট করা
         $mpdf->SetTitle('Order Report - ' . now()->format('d M, Y'));
-
-        // HTML থেকে PDF তৈরি করা
         $mpdf->WriteHTML($html);
 
-        // PDF ফাইলটি ডাউনলোড করতে 'D' (Download) প্যারামিটার ব্যবহার করা হলো
         $fileName = 'Order_Report_' . now()->format('d_M_Y') . '.pdf';
-        return response($mpdf->Output($fileName, 'I'))->header('Content-Type', 'application/pdf');
+
+        // Output-এর আগে সব বাফার ক্লিন করা হচ্ছে যাতে কোরাপ্ট না হয়
+        if (ob_get_contents()) {
+            ob_end_clean();
+        }
+
+        // সরাসরি mPDF আউটপুট ব্রাউজারে পাঠানো
+        $mpdf->Output($fileName, 'I');
+        exit;
+    }
+
+    public function exportExcel(Request $request)
+    {
+        // Excel export-এও PDF এবং Order List-এর same filtered data যাবে।
+        $orders = $this->buildOrderReportQuery($request)->orderBy('id', 'desc')->get();
+        $fileName = 'Order_Report_' . now()->format('d_M_Y') . '.xlsx';
+
+        return Excel::download(new OrdersExport($orders), $fileName);
     }
 
 
@@ -226,6 +241,179 @@ class OrderController extends Controller
 
         return response()->json(['status' => 'success']);
     }
+
+
+    /**
+     * Order edit page.
+     * এখানে নতুন প্রোডাক্ট অ্যাড করার কোনো অপশন নেই।
+     * শুধু existing order item quantity এবং payment summary edit করা যাবে।
+     */
+    public function edit($id)
+    {
+        $order = Order::with(['customer', 'table', 'waiter', 'orderDetails', 'user'])->findOrFail($id);
+        $taxSetting = DB::table('tax_settings')->first();
+
+        $vatRate = (float) ($taxSetting->vat_rate ?? 0);
+        $normalizedOrderType = strtolower(str_replace('_', '-', (string) $order->order_type));
+        $serviceChargeRate = $normalizedOrderType === 'dine-in'
+            ? (float) ($taxSetting->service_charge ?? 0)
+            : 0;
+
+        // DB-তে discount_amount calculated amount হিসেবে থাকে।
+        // যদি পুরনো order percentage discount দিয়ে করা হয়, edit form-এ percentage value approximate করে দেখানো হবে।
+        $discountValue = (float) ($order->discount_amount ?? 0);
+        if (($order->discount_type ?? 'fixed') === 'percentage' && (float) ($order->subtotal ?? 0) > 0) {
+            $discountValue = round(((float) $order->discount_amount / (float) $order->subtotal) * 100, 2);
+        }
+
+        return view('admin.order.edit', compact('order', 'taxSetting', 'vatRate', 'serviceChargeRate', 'discountValue'));
+    }
+
+    /**
+     * Update order quantity + payment summary.
+     * নতুন item add/delete করা হচ্ছে না; শুধু বর্তমান order_details line quantity update হবে।
+     */
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'items' => ['required', 'array'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'discount_type' => ['required', Rule::in(['fixed', 'percentage'])],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
+            'payment_method' => ['required', Rule::in(['Cash', 'Card', 'Mobile Banking', 'Split'])],
+            'total_paid_amount' => ['nullable', 'numeric', 'min:0'],
+            'tips_amount' => ['nullable', 'numeric', 'min:0'],
+            'given_money' => ['nullable', 'numeric', 'min:0'],
+            'change_amount' => ['nullable', 'numeric', 'min:0'],
+            'paid_in_cash' => ['nullable', 'numeric', 'min:0'],
+            'paid_in_card' => ['nullable', 'numeric', 'min:0'],
+            'paid_in_mfc' => ['nullable', 'numeric', 'min:0'],
+            'transaction_id' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $order = Order::with('orderDetails')->lockForUpdate()->findOrFail($id);
+            $inputItems = $request->input('items', []);
+
+            $newSubtotal = 0;
+
+            foreach ($order->orderDetails as $detail) {
+                // শুধু existing detail id গুলোই update হবে, নতুন কোনো item create হবে না।
+                if (!isset($inputItems[$detail->id])) {
+                    $newSubtotal += (float) ($detail->subtotal ?? 0);
+                    continue;
+                }
+
+                $newQty = max(1, (int) ($inputItems[$detail->id]['quantity'] ?? $detail->quantity));
+                $oldQty = max(1, (int) ($detail->quantity ?? 1));
+                $oldLineSubtotal = (float) ($detail->subtotal ?? 0);
+
+                // Existing line subtotal/qty থেকে unit total বের করা হচ্ছে, যাতে addon price preserve থাকে।
+                if ($oldLineSubtotal > 0 && $oldQty > 0) {
+                    $unitTotal = $oldLineSubtotal / $oldQty;
+                } else {
+                    $addonTotal = 0;
+                    $addons = json_decode($detail->addons ?? '[]', true);
+                    if (is_array($addons)) {
+                        foreach ($addons as $addon) {
+                            $addonTotal += (float) ($addon['price'] ?? 0);
+                        }
+                    }
+                    $unitTotal = (float) ($detail->price ?? 0) + $addonTotal;
+                }
+
+                $newLineSubtotal = round($unitTotal * $newQty, 2);
+
+                $detail->quantity = $newQty;
+                $detail->subtotal = $newLineSubtotal;
+                $detail->save();
+
+                $newSubtotal += $newLineSubtotal;
+            }
+
+            $taxSetting = DB::table('tax_settings')->first();
+            $vatRate = (float) ($taxSetting->vat_rate ?? 0);
+
+            $normalizedOrderType = strtolower(str_replace('_', '-', (string) $order->order_type));
+            $serviceChargeRate = $normalizedOrderType === 'dine-in'
+                ? (float) ($taxSetting->service_charge ?? 0)
+                : 0;
+
+            $serviceCharge = round(($newSubtotal * $serviceChargeRate) / 100);
+            $vatTax = round((($newSubtotal + $serviceCharge) * $vatRate) / 100);
+
+            $discountType = $request->discount_type ?? 'fixed';
+            $discountValue = (float) ($request->discount_value ?? 0);
+            $discountAmount = $discountType === 'percentage'
+                ? round(($newSubtotal * $discountValue) / 100)
+                : round($discountValue);
+
+            // Discount যেন bill amount-এর বেশি না হয়।
+            $discountAmount = min(max(0, $discountAmount), round($newSubtotal + $serviceCharge + $vatTax));
+            $grandTotal = max(0, round(($newSubtotal + $serviceCharge + $vatTax) - $discountAmount));
+
+            $paymentMethod = $request->payment_method;
+            if ($paymentMethod === 'Split') {
+                $cash = max(0, (float) ($request->paid_in_cash ?? 0));
+                $card = max(0, (float) ($request->paid_in_card ?? 0));
+                $mfc = max(0, (float) ($request->paid_in_mfc ?? 0));
+                $totalPaid = round($cash + $card + $mfc, 2);
+            } else {
+                $totalPaid = max(0, (float) ($request->total_paid_amount ?? 0));
+                $cash = $paymentMethod === 'Cash' ? $totalPaid : 0;
+                $card = $paymentMethod === 'Card' ? $totalPaid : 0;
+                $mfc = $paymentMethod === 'Mobile Banking' ? $totalPaid : 0;
+            }
+
+            $tipsAmount = max(0, round((float) ($request->tips_amount ?? 0), 2));
+            $givenMoney = max(0, round((float) ($request->given_money ?? 0), 2));
+            $changeAmount = max(0, round($givenMoney - $totalPaid - $tipsAmount, 2));
+            $due = max(0, round($grandTotal - $totalPaid, 2));
+
+            $order->subtotal = $newSubtotal;
+            $order->discount_type = $discountType;
+            $order->discount_amount = $discountAmount;
+            $order->vat_tax = $vatTax;
+            $order->service_charge = $serviceCharge;
+            $order->grand_total = $grandTotal;
+            $order->payment_type = $paymentMethod;
+            // Transaction ID শুধু Mobile Banking payment হলে রাখা হবে। অন্য payment type হলে পুরনো transaction ID clear হবে।
+            $order->transaction_id = $paymentMethod === 'Mobile Banking' ? $request->transaction_id : null;
+            $order->total_paid_amount = $totalPaid;
+            $order->paid_in_cash = $cash;
+            $order->paid_in_card = $card;
+            $order->paid_in_mfc = $mfc;
+            $order->due = $due;
+
+            if (Schema::hasColumn('orders', 'tips_amount')) {
+                $order->tips_amount = $tipsAmount;
+            }
+            if (Schema::hasColumn('orders', 'given_money')) {
+                $order->given_money = $givenMoney;
+            }
+            if (Schema::hasColumn('orders', 'change_amount')) {
+                $order->change_amount = $changeAmount;
+            }
+
+            $order->save();
+
+            DB::commit();
+
+            return redirect()
+                ->route('order.edit', $order->id)
+                ->with('success', 'Order updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Order update failed! ' . $e->getMessage());
+        }
+    }
+
 
     public function details($id)
     {

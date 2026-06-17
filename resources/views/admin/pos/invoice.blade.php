@@ -271,6 +271,9 @@
                     <td>{{ $item->quantity }}</td>
                     <td>
                       <div class="bill-item-name">{{ $item->product_name }}</div>
+                      @if((isset($item->is_complimentary) && $item->is_complimentary) || ((float) $item->price <= 0 && (float) $item->subtotal <= 0))
+                        <div class="bill-item-note">Complimentary</div>
+                      @endif
                       @if($item->food_note)
                         <div class="bill-item-note">{{ $item->food_note }}</div>
                       @endif
@@ -324,16 +327,48 @@
         </div>
       </div>
 
-      <div class="bill-payment">
-        <div>
-          <div class="bill-payment-label">Paid By</div>
-          <div class="bill-payment-val">{{ $order->payment_type ?? 'Cash' }}</div>
+      @if(($order->payment_type ?? 'Cash') === 'Split')
+        <div class="bill-payment" style="display:block;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <div>
+              <div class="bill-payment-label">Paid By</div>
+              <div class="bill-payment-val">Split</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="bill-payment-label">Total Paid</div>
+              <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_amount ?? $order->total_paid_amount ?? 0, 0) }}</div>
+            </div>
+          </div>
+          <div class="bill-total-row"><span>Cash</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_cash ?? $order->paid_in_cash ?? 0, 0) }}</span></div>
+          <div class="bill-total-row"><span>Card</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_card ?? $order->paid_in_card ?? 0, 0) }}</span></div>
+          <div class="bill-total-row"><span>MFC / Mobile</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_mfc ?? $order->paid_in_mfc ?? 0, 0) }}</span></div>
+          @if(($order->change_amount ?? 0) > 0)
+            <div class="bill-total-row"><span>Change</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->change_amount, 0) }}</span></div>
+          @endif
+          @if(($order->due ?? 0) > 0)
+            <div class="bill-total-row"><span>Due</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->due, 0) }}</span></div>
+          @endif
         </div>
-        <div style="text-align:right;">
-          <div class="bill-payment-label">Change</div>
-          <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} 0</div>
+      @else
+        <div class="bill-payment" style="display:block;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <div>
+              <div class="bill-payment-label">Paid By</div>
+              <div class="bill-payment-val">{{ $order->payment_type ?? 'Cash' }}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="bill-payment-label">Total Paid</div>
+              <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->total_paid_amount ?? 0, 0) }}</div>
+            </div>
+          </div>
+          @if(($order->change_amount ?? 0) > 0)
+            <div class="bill-total-row"><span>Change</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->change_amount, 0) }}</span></div>
+          @endif
+          @if(($order->due ?? 0) > 0)
+            <div class="bill-total-row"><span>Due</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->due, 0) }}</span></div>
+          @endif
         </div>
-      </div>
+      @endif
 
       <div class="bill-server">
         You Have Been Served By: <strong>{{ $order->waiter->name ?? $order->user->name ?? 'N/A' }}</strong>
