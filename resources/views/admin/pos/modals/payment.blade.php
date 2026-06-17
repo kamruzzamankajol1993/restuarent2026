@@ -102,7 +102,7 @@
                           <input type="number" name="paid_in_card" id="splitCard" class="form-control split-input p-1 text-center" value="0" min="0" step="0.01">
                       </div>
                       <div class="col-4">
-                          <label style="font-size: 11px; font-weight: 700; color: #555;">MFC (Mobile)</label>
+                          <label style="font-size: 11px; font-weight: 700; color: #555;">MFS (Mobile)</label>
                           <input type="number" name="paid_in_mfc" id="splitMfc" class="form-control split-input p-1 text-center" value="0" min="0" step="0.01">
                       </div>
                   </div>
@@ -110,7 +110,7 @@
 
               <div class="progga-pm-ref" id="transactionDiv" style="display: none; margin-bottom: 15px;">
                   <label style="font-size: 12px; font-weight: 700; color: #555;">Transaction / Reference No</label>
-                  <input type="text" name="transaction_id" class="form-control" placeholder="e.g. TXN-8473920" style="border: 1.5px solid var(--progga-border); border-radius: 8px;">
+                  <input type="text" name="transaction_id" class="form-control" placeholder="Card auth / TXN / Reference no" style="border: 1.5px solid var(--progga-border); border-radius: 8px;">
               </div>
 
               <div class="progga-form-label" style="font-weight:700; margin:16px 0 10px; font-size: 14px; color: var(--progga-primary);">
@@ -184,7 +184,7 @@ function posMoney(value) {
 window.syncFinalPaymentFields = function() {
     let method = $('input[name="payment_method"]:checked').val() || 'Cash';
     let isSplit = method === 'Split';
-    let isMobileBanking = method === 'Mobile Banking';
+    let showReferenceField = method === 'Mobile Banking' || method === 'Card';
 
     $('#normalPaidRow').css('display', isSplit ? 'none' : 'flex');
     $('#splitPaidDisplayRow').css('display', isSplit ? 'flex' : 'none');
@@ -192,8 +192,12 @@ window.syncFinalPaymentFields = function() {
     $('#payTotalPaidAmount').prop('disabled', isSplit);
     $('#splitCash, #splitCard, #splitMfc').prop('disabled', !isSplit);
 
-    $('#transactionDiv').toggle(isMobileBanking);
-    $('#transactionDiv').find('input[name="transaction_id"]').prop('disabled', !isMobileBanking);
+    $('#transactionDiv').toggle(showReferenceField);
+    $('#transactionDiv').find('input[name="transaction_id"]').prop('disabled', !showReferenceField);
+
+    if (!showReferenceField) {
+        $('#transactionDiv').find('input[name="transaction_id"]').val('');
+    }
 };
 
 window.getFinalPaymentBillPaid = function() {

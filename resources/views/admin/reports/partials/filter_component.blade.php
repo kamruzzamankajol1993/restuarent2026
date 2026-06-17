@@ -1,7 +1,6 @@
-<form id="reportFilterForm" class="progga-card-body report-filter-line" style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; padding:15px; border-bottom: 1px solid var(--progga-border-light);">
-
-    <div class="progga-form-group" style="margin:0;">
-        <label class="progga-form-label" style="margin-bottom:3px;">Filter Type</label>
+<form id="reportFilterForm" class="progga-card-body report-filter-line">
+    <div class="progga-form-group">
+        <label class="progga-form-label">Filter Type</label>
         <select name="filter_type" id="filterType" class="progga-select">
             <option value="year" {{ $filterType == 'year' ? 'selected' : '' }}>Year Wise</option>
             <option value="month" {{ $filterType == 'month' ? 'selected' : '' }}>Month Wise</option>
@@ -9,8 +8,8 @@
         </select>
     </div>
 
-    <div class="progga-form-group" id="yearField" style="margin:0; display: {{ in_array($filterType, ['year', 'month']) ? 'block' : 'none' }};">
-        <label class="progga-form-label" style="margin-bottom:3px;">Year</label>
+    <div class="progga-form-group" id="yearField" style="display: {{ in_array($filterType, ['year', 'month']) ? 'block' : 'none' }};">
+        <label class="progga-form-label">Year</label>
         <select name="year" id="filterYear" class="progga-select">
             @foreach($yearOptions as $yr)
                 <option value="{{ $yr }}" {{ (int)$year === (int)$yr ? 'selected' : '' }}>{{ $yr }}</option>
@@ -18,29 +17,29 @@
         </select>
     </div>
 
-    <div class="progga-form-group" id="monthField" style="margin:0; display: {{ $filterType == 'month' ? 'block' : 'none' }};">
-        <label class="progga-form-label" style="margin-bottom:3px;">Month</label>
+    <div class="progga-form-group" id="monthField" style="display: {{ $filterType == 'month' ? 'block' : 'none' }};">
+        <label class="progga-form-label">Month</label>
         <select name="month" id="filterMonth" class="progga-select">
             @for($m=1; $m<=12; $m++)
-                <option value="{{ $m }}" {{ (int)$month === $m ? 'selected' : '' }}>{{ \Carbon\Carbon::create(null,$m,1)->format('F') }}</option>
+                <option value="{{ $m }}" {{ (int)$month === $m ? 'selected' : '' }}>{{ \Carbon\Carbon::create(null, $m, 1)->format('F') }}</option>
             @endfor
         </select>
     </div>
 
-    <div id="dateRangeFields" style="display: {{ $filterType == 'date' ? 'flex' : 'none' }}; gap:10px; align-items:flex-end;">
-        <div class="progga-form-group" style="margin:0;">
-            <label class="progga-form-label" style="margin-bottom:3px;">From Date</label>
-            <input type="text" name="start_date" id="startDate" class="progga-form-control datepicker" value="{{ $startDate->format('Y-m-d') }}" placeholder="YYYY-MM-DD">
+    <div id="dateRangeFields" style="display: {{ $filterType == 'date' ? 'flex' : 'none' }}; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="progga-form-group">
+            <label class="progga-form-label">From Date</label>
+            <input type="text" name="start_date" id="startDate" class="progga-form-control datepicker" value="{{ $startDate->format('Y-m-d') }}" placeholder="YYYY-MM-DD" autocomplete="off">
         </div>
-        <div class="progga-form-group" style="margin:0;">
-            <label class="progga-form-label" style="margin-bottom:3px;">To Date</label>
-            <input type="text" name="end_date" id="endDate" class="progga-form-control datepicker" value="{{ $endDate->format('Y-m-d') }}" placeholder="YYYY-MM-DD">
+        <div class="progga-form-group">
+            <label class="progga-form-label">To Date</label>
+            <input type="text" name="end_date" id="endDate" class="progga-form-control datepicker" value="{{ $endDate->format('Y-m-d') }}" placeholder="YYYY-MM-DD" autocomplete="off">
         </div>
     </div>
 
     @if(isset($showPaymentFilter) && $showPaymentFilter)
-    <div class="progga-form-group" style="margin:0;">
-        <label class="progga-form-label" style="margin-bottom:3px;">Payment Type</label>
+    <div class="progga-form-group">
+        <label class="progga-form-label">Payment Type</label>
         <select name="payment_method" id="paymentMethod" class="progga-select">
             <option value="">All Payments</option>
             <option value="Cash" {{ ($paymentMethod ?? '') == 'Cash' ? 'selected' : '' }}>Cash</option>
@@ -51,8 +50,13 @@
     </div>
     @endif
 
-    <div style="margin-top: auto;">
-        <a href="{{ url()->current() }}" class="progga-btn progga-btn-outline progga-btn-sm" style="height: 38px; display: inline-flex; align-items: center;"><i class="bi bi-arrow-clockwise"></i> Reset</a>
+    <div style="margin-top:auto;display:flex;gap:8px;">
+        <button type="button" class="progga-btn progga-btn-primary progga-btn-sm" id="applyReportFilter" style="height:38px;">
+            <i class="bi bi-funnel"></i> Apply
+        </button>
+        <a href="{{ url()->current() }}" class="progga-btn progga-btn-outline progga-btn-sm" style="height:38px; display:inline-flex; align-items:center;">
+            <i class="bi bi-arrow-clockwise"></i> Reset
+        </a>
     </div>
 </form>
 
@@ -67,42 +71,35 @@ $(document).ready(function() {
     const $dateRange = $('#dateRangeFields');
     const $form = $('#reportFilterForm');
 
-    // ১. Flatpickr Initialize
-    flatpickr(".datepicker", {
-        dateFormat: "Y-m-d",
-        allowInput: true,
-        onChange: function(selectedDates, dateStr, instance) {
-            triggerAjaxFetch();
-        }
+    flatpickr('.datepicker', {
+        dateFormat: 'Y-m-d',
+        allowInput: true
     });
 
-    // ২. ফিল্ড টগল ফাংশন (jQuery)
     function toggleFields() {
-        let val = $filterType.val();
+        const val = $filterType.val();
 
         if (val === 'year') {
             $yearField.show();
             $monthField.hide();
-            $dateRange.hide().removeClass('d-flex');
+            $dateRange.hide();
         } else if (val === 'month') {
             $yearField.show();
             $monthField.show();
-            $dateRange.hide().removeClass('d-flex');
-        } else if (val === 'date') {
+            $dateRange.hide();
+        } else {
             $yearField.hide();
             $monthField.hide();
             $dateRange.css('display', 'flex');
         }
     }
 
-    // ৩. Ajax কল ফাংশন
-    function triggerAjaxFetch() {
-        let formData = $form.serialize();
-        let fetchUrl = window.location.pathname + '?' + formData;
-
-        // Update URL dynamically
+    window.triggerReportFetch = function() {
+        const formData = $form.serialize();
+        const fetchUrl = window.location.pathname + '?' + formData;
         window.history.pushState({}, '', fetchUrl);
 
+        $('#salesReportCard').addClass('report-loading');
         $.ajax({
             url: fetchUrl,
             type: 'GET',
@@ -111,27 +108,32 @@ $(document).ready(function() {
                 'Accept': 'application/json'
             },
             success: function(data) {
-                if(typeof updateReportDOM === 'function') {
+                if (typeof updateReportDOM === 'function') {
                     updateReportDOM(data);
                 }
             },
             error: function(err) {
-                console.error("Error loading report data: ", err);
+                console.error('Report data loading failed.', err);
+            },
+            complete: function() {
+                $('#salesReportCard').removeClass('report-loading');
             }
         });
-    }
+    };
 
-    // ৪. Select2 / Choices.js ফ্রেন্ডলি ইভেন্ট লিসেনার
     $filterType.on('change', function() {
         toggleFields();
-        triggerAjaxFetch();
+        window.triggerReportFetch();
     });
 
     $('#filterYear, #filterMonth, #paymentMethod').on('change', function() {
-        triggerAjaxFetch();
+        window.triggerReportFetch();
     });
 
-    // Initial Check
+    $('#applyReportFilter').on('click', function() {
+        window.triggerReportFetch();
+    });
+
     toggleFields();
 });
 </script>

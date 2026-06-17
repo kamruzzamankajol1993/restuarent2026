@@ -11,14 +11,24 @@ class OrderDetail extends Model
 
     protected $guarded = [];
 
-    // রিলেশনশিপ
+    // Relationships
     public function order()
     {
         return $this->belongsTo(Order::class);
     }
 
     public function kot()
-{
-    return $this->belongsTo(OrderKot::class, 'order_kot_id');
-}
+    {
+        return $this->belongsTo(OrderKot::class, 'order_kot_id');
+    }
+
+    public function foodItem()
+    {
+        return $this->belongsTo(FoodItem::class, 'product_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(FoodItem::class, 'product_id');
+    }
 }

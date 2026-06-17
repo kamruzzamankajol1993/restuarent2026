@@ -2,6 +2,7 @@
 @section('title', 'Order List — TableTrack RMS')
 
 @section('css')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style>
     /* ── Order List page-specific ── */
     .progga-order-items-preview { display: flex; flex-direction: column; gap: 2px; }
@@ -185,14 +186,23 @@
           <option value="Cancelled">Cancelled</option>
         </select>
       </div>
-      <div style="min-width:150px;">
-        <select class="progga-select filter-trigger" id="filterDate" data-placeholder="Date Range">
-          <option value="">All Time</option>
-          <option value="Today">Today</option>
-          <option value="Yesterday">Yesterday</option>
-          <option value="This Week">This Week</option>
-          <option value="This Month">This Month</option>
-        </select>
+      <div style="min-width:260px;">
+        <div class="d-flex align-items-center" style="gap:6px;">
+          <input type="text"
+                 class="progga-form-control"
+                 id="filterDateRange"
+                 placeholder="Select order date range"
+                 autocomplete="off"
+                 readonly>
+          <button type="button"
+                  class="progga-btn progga-btn-outline progga-btn-sm"
+                  id="clearDateFilter"
+                  title="Clear date filter">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <input type="hidden" id="filterDateFrom" value="">
+        <input type="hidden" id="filterDateTo" value="">
       </div>
       <div style="min-width:140px;">
         <select class="progga-select filter-trigger" id="filterPayment" data-placeholder="Payment">
@@ -229,17 +239,56 @@
 @endsection
 
 @section('script')
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+    let orderDatePicker = null;
+
+    $(document).ready(function() {
+        if (typeof flatpickr !== 'undefined') {
+            orderDatePicker = flatpickr('#filterDateRange', {
+                mode: 'range',
+                dateFormat: 'Y-m-d',
+                maxDate: 'today',
+                onChange: function(selectedDates) {
+                    if (selectedDates.length === 2) {
+                        $('#filterDateFrom').val(flatpickr.formatDate(selectedDates[0], 'Y-m-d'));
+                        $('#filterDateTo').val(flatpickr.formatDate(selectedDates[1], 'Y-m-d'));
+                        fetchOrders();
+                    }
+
+                    if (selectedDates.length === 0) {
+                        $('#filterDateFrom').val('');
+                        $('#filterDateTo').val('');
+                        fetchOrders();
+                    }
+                }
+            });
+        }
+    });
+
+    $('#clearDateFilter').on('click', function() {
+        $('#filterDateFrom').val('');
+        $('#filterDateTo').val('');
+
+        if (orderDatePicker) {
+            orderDatePicker.clear();
+        } else {
+            $('#filterDateRange').val('');
+            fetchOrders();
+        }
+    });
+
     function fetchOrders(url) {
         let search = $('#searchOrder').val();
         let status = $('#filterStatus').val();
-        let date = $('#filterDate').val();
+        let dateFrom = $('#filterDateFrom').val();
+        let dateTo = $('#filterDateTo').val();
         let payment = $('#filterPayment').val();
 
         $('#order_data_container').css('opacity', '0.5');
         $.ajax({
             url: url || "{{ route('order.index') }}",
-            data: { search: search, status: status, date_range: date, payment: payment },
+            data: { search: search, status: status, date_from: dateFrom, date_to: dateTo, payment: payment },
             success: function(data) {
                 $('#order_data_container').html(data).css('opacity', '1');
             }
@@ -338,26 +387,26 @@
     });
 };
 
-   // PDF এবং Excel export একই current filter ব্যবহার করবে।
+   // PDF and Excel export use the current filter state.
    function buildOrderExportQueryString() {
         let search = $('#searchOrder').val() || '';
         let status = $('#filterStatus').val() || '';
-        let date = $('#filterDate').val() || '';
+        let dateFrom = $('#filterDateFrom').val() || '';
+        let dateTo = $('#filterDateTo').val() || '';
         let payment = $('#filterPayment').val() || '';
 
         return "search=" + encodeURIComponent(search) +
                "&status=" + encodeURIComponent(status) +
-               "&date_range=" + encodeURIComponent(date) +
+               "&date_from=" + encodeURIComponent(dateFrom) +
+               "&date_to=" + encodeURIComponent(dateTo) +
                "&payment=" + encodeURIComponent(payment);
     }
 
    function exportOrderPDF() {
-        // নতুন ট্যাবে filtered PDF ওপেন করা।
         window.open("{{ route('order.export_pdf') }}?" + buildOrderExportQueryString(), '_blank');
     }
 
    function exportOrderExcel() {
-        // একই filtered data Excel file হিসেবে download হবে।
         window.location.href = "{{ route('order.export_excel') }}?" + buildOrderExportQueryString();
     }
 </script>

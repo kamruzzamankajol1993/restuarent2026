@@ -79,15 +79,17 @@ Dashboard — {{ $restaurantSettingName ?? 'TableTrack RMS' }}
           <div class="progga-card-header">
             <div>
               <div class="progga-card-title">Revenue Overview</div>
-              <div class="progga-card-subtitle">Daily revenue trend (Last 7 Days)</div>
+              <div class="progga-card-subtitle" id="revenueChartSubtitle">Dynamic revenue trend from completed orders</div>
             </div>
             <div class="progga-chart-toggle">
               <button class="progga-chart-toggle-btn active" data-revenue-period="7">7 Days</button>
+              <button class="progga-chart-toggle-btn" data-revenue-period="30">30 Days</button>
+              <button class="progga-chart-toggle-btn" data-revenue-period="12m">12 Months</button>
             </div>
           </div>
           <div class="progga-card-body">
             <div class="progga-chart-container" style="height:260px;">
-              <canvas id="revenueChart"></canvas>
+              <canvas id="revenueChart" data-dashboard-dynamic="true"></canvas>
             </div>
           </div>
         </div>
@@ -100,7 +102,7 @@ Dashboard — {{ $restaurantSettingName ?? 'TableTrack RMS' }}
           </div>
           <div class="progga-card-body" style="display:flex;flex-direction:column;align-items:center;">
             <div class="progga-chart-container" style="height:220px;width:100%;">
-              <canvas id="orderStatusChart"></canvas>
+              <canvas id="orderStatusChart" data-dashboard-dynamic="true"></canvas>
             </div>
           </div>
         </div>
@@ -123,7 +125,7 @@ Dashboard — {{ $restaurantSettingName ?? 'TableTrack RMS' }}
                 @php
                   $currentQty = $topItemsData[$index] ?? 0;
                   $percentage = ($currentQty / $maxQty) * 100;
-                  // সুন্দর থিম কালার অ্যাসাইনমেন্ট
+                  // Theme color assignment for top item bars
                   $barColor = $index == 0 ? '#21352a' : ($index == 1 ? '#2c4436' : '#d5aa65');
                 @endphp
                 <div>
@@ -248,61 +250,123 @@ Dashboard — {{ $restaurantSettingName ?? 'TableTrack RMS' }}
 @endsection
 
 @section('script')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    const chartDataUrl = "{{ route('dashboard.chart_data') }}";
+    let revenueChart;
+    let orderStatusChart;
 
-    // 1. Revenue Line Chart (Last 7 Days)
-    const ctxRevenue = document.getElementById('revenueChart').getContext('2d');
-    new Chart(ctxRevenue, {
-        type: 'line',
-        data: {
-            labels: @json($chartLabels),
-            datasets: [{
-                label: 'Revenue (৳)',
-                data: @json($chartData),
-                borderColor: '#21352a',
-                backgroundColor: 'rgba(33, 53, 42, 0.1)',
-                borderWidth: 3,
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: '#d5aa65',
-                pointBorderColor: '#fff',
-                pointHoverRadius: 6
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
-                x: { grid: { display: false } }
+    function revenueSubtitle(period) {
+        if (period === '30') return 'Daily revenue trend from the last 30 days';
+        if (period === '12m') return 'Monthly revenue trend from the last 12 months';
+        return 'Daily revenue trend from the last 7 days';
+    }
+
+    function buildRevenueChart(labels, data) {
+        const revenueCanvas = document.getElementById('revenueChart');
+        if (!revenueCanvas || typeof Chart === 'undefined') return;
+
+        const oldRevenueChart = Chart.getChart(revenueCanvas);
+        if (oldRevenueChart) oldRevenueChart.destroy();
+
+        const ctxRevenue = revenueCanvas.getContext('2d');
+        revenueChart = new Chart(ctxRevenue, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Revenue (৳)',
+                    data: data,
+                    borderColor: '#21352a',
+                    backgroundColor: 'rgba(33, 53, 42, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#d5aa65',
+                    pointBorderColor: '#fff',
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
+                    x: { grid: { display: false } }
+                }
             }
-        }
-    });
+        });
+    }
 
-    // 2. Order Status Donut Chart
-    const ctxStatus = document.getElementById('orderStatusChart').getContext('2d');
-    new Chart(ctxStatus, {
-        type: 'doughnut',
-        data: {
-            labels: @json($statusLabels),
-            datasets: [{
-                data: @json($statusData),
-                backgroundColor: ['#d5aa65', '#17a2b8', '#1e7a4a', '#21352a', '#dc3545'],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            cutout: '75%',
-            plugins: {
-                legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true, padding: 20 } }
+    function buildOrderStatusChart(labels, data) {
+        const statusCanvas = document.getElementById('orderStatusChart');
+        if (!statusCanvas || typeof Chart === 'undefined') return;
+
+        const oldStatusChart = Chart.getChart(statusCanvas);
+        if (oldStatusChart) oldStatusChart.destroy();
+
+        const ctxStatus = statusCanvas.getContext('2d');
+        orderStatusChart = new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: ['#d5aa65', '#6c757d', '#17a2b8', '#1e7a4a', '#21352a', '#0d6efd', '#dc3545', '#6610f2', '#fd7e14'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '75%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true, padding: 20 } }
+                }
             }
-        }
-    });
+        });
+    }
 
+    function refreshDashboardCharts(period) {
+        fetch(chartDataUrl + '?period=' + encodeURIComponent(period), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(payload => {
+            if (!revenueChart) {
+                buildRevenueChart(payload.chartLabels, payload.chartData);
+            } else {
+                revenueChart.data.labels = payload.chartLabels;
+                revenueChart.data.datasets[0].data = payload.chartData;
+                revenueChart.update();
+            }
+
+            if (!orderStatusChart) {
+                buildOrderStatusChart(payload.statusLabels, payload.statusData);
+            } else {
+                orderStatusChart.data.labels = payload.statusLabels;
+                orderStatusChart.data.datasets[0].data = payload.statusData;
+                orderStatusChart.update();
+            }
+
+            const subtitle = document.getElementById('revenueChartSubtitle');
+            if (subtitle) subtitle.textContent = revenueSubtitle(payload.period);
+        })
+        .catch(error => console.error('Dashboard chart data loading failed.', error));
+    }
+
+    buildRevenueChart(@json($chartLabels), @json($chartData));
+    buildOrderStatusChart(@json($statusLabels), @json($statusData));
+
+    document.querySelectorAll('[data-revenue-period]').forEach(button => {
+        button.addEventListener('click', function() {
+            document.querySelectorAll('[data-revenue-period]').forEach(item => item.classList.remove('active'));
+            this.classList.add('active');
+            refreshDashboardCharts(this.getAttribute('data-revenue-period'));
+        });
+    });
 });
 </script>
 @endsection

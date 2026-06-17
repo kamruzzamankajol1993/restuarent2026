@@ -204,7 +204,7 @@
 
      document.addEventListener("DOMContentLoaded", function () {
 
-    // ১. Choices.js (যেখানে বিশেষভাবে Choices.js লাগবে সেখানে .progga-choices ক্লাস ব্যবহার করবেন)
+    // POS workflow note.
     const choicesElements = document.querySelectorAll('.progga-choices');
     choicesElements.forEach(function(element) {
         new Choices(element, {
@@ -213,7 +213,7 @@
             removeItemButton: true,
             shouldSort: false
         });
-        // Select2 যাতে এই এলিমেন্টে কাজ না করে, তা নিশ্চিত করতে
+        // POS workflow note.
         element.setAttribute('data-no-select2', 'true');
     });
 });
@@ -259,7 +259,7 @@ let isMasterWaiter = @json(auth()->check() && auth()->user()->hasRole('waiter'))
             success: function(res) {
                 if (res.status === 'success') {
 
-                    // ওয়েটার লগইন থাকলে QR অর্ডারের মোডাল আসবে না
+                    // POS workflow note.
                     if (res.order && !isMasterWaiter) {
                         isPolling = false;
                         playSound();
@@ -300,7 +300,7 @@ let isMasterWaiter = @json(auth()->check() && auth()->user()->hasRole('waiter'))
                         return;
                     }
 
-                    // Waiter Call নোটিফিকেশন সবাই দেখতে পাবে (বা চাইলে এখানেও !isMasterWaiter দিতে পারেন)
+                    // POS workflow note.
                     if (res.waiter_call) {
                         isPolling = false;
                         playSound();

@@ -14,6 +14,8 @@
         .table th { background-color: #21352a; color: #ffffff; font-size: 12px; font-weight: bold; }
         .table td { font-size: 11px; }
         .text-right { text-align: right; }
+        .sales-table th, .sales-table td { font-size: 9px; padding: 5px 4px; }
+        .sales-table th { white-space: nowrap; }
         .text-center { text-align: center; }
         .footer { margin-top: 30px; font-size: 11px; text-align: center; border-top: 1px dashed #ddd; padding-top: 10px; color: #888; }
     </style>
@@ -35,15 +37,47 @@
     </div>
 
     @if($report === 'payment_type_sales')
-        @php $total = $dataRows->sum('amount'); @endphp
+        @php $totalPaid = $dataRows->sum('total_paid'); @endphp
         <table class="table">
-            <thead><tr><th>Payment Type</th><th class="text-center">Order Count</th><th class="text-right">Amount</th><th class="text-right">Share</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Table</th>
+                    <th>Payment Type</th>
+                    <th class="text-right">Cash</th>
+                    <th class="text-right">Card</th>
+                    <th class="text-right">MFC</th>
+                    <th class="text-right">Total Paid</th>
+                </tr>
+            </thead>
             <tbody>
-            @foreach($dataRows as $row)
-                <tr><td>{{ $row['label'] }}</td><td class="text-center">{{ $row['orders_count'] }}</td><td class="text-right">৳{{ number_format($row['amount'], 2) }}</td><td class="text-right">{{ number_format($row['percentage'], 2) }}%</td></tr>
-            @endforeach
+            @forelse($dataRows as $row)
+                <tr>
+                    <td><strong>#{{ $row['order_number'] }}</strong></td>
+                    <td>{{ $row['date'] }}</td>
+                    <td>{{ $row['customer'] }}</td>
+                    <td>{{ $row['table'] }}</td>
+                    <td>{{ $row['payment_type'] }}</td>
+                    <td class="text-right">৳{{ number_format($row['cash'], 2) }}</td>
+                    <td class="text-right">৳{{ number_format($row['card'], 2) }}</td>
+                    <td class="text-right">৳{{ number_format($row['mfc'], 2) }}</td>
+                    <td class="text-right"><strong>৳{{ number_format($row['total_paid'], 2) }}</strong></td>
+                </tr>
+            @empty
+                <tr><td colspan="9" class="text-center">No payment data found.</td></tr>
+            @endforelse
             </tbody>
-            <tfoot><tr><th colspan="2" class="text-right">Total</th><th class="text-right">৳{{ number_format($total, 2) }}</th><th></th></tr></tfoot>
+            <tfoot>
+                <tr>
+                    <th colspan="5" class="text-right">Total</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('cash'), 2) }}</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('card'), 2) }}</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('mfc'), 2) }}</th>
+                    <th class="text-right">৳{{ number_format($totalPaid, 2) }}</th>
+                </tr>
+            </tfoot>
         </table>
     @elseif($report === 'food_sales')
         <table class="table">
@@ -56,17 +90,90 @@
             @endforelse
             </tbody>
         </table>
-    @else
-        <table class="table">
-            <thead><tr><th>SL</th><th>Period</th><th class="text-right">Total Sale</th><th class="text-right">Discount Report</th><th class="text-center">Total Order</th></tr></thead>
+   @else
+        <table class="table sales-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Items</th>
+                    <th class="text-right">Subtotal</th>
+                    <th class="text-right">Discount</th>
+                    <th class="text-right">Service</th>
+                    <th class="text-right">Tips</th>
+                    <th class="text-right">Given</th>
+                    <th class="text-right">Change</th>
+                    <th class="text-right">Grand Total</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                    <th>KOT to Pay</th>
+                </tr>
+            </thead>
             <tbody>
-            @forelse($dataRows as $key => $row)
-                <tr><td>{{ $key + 1 }}</td><td>{{ $row['period'] }}</td><td class="text-right">৳{{ number_format($row['total_sale'], 0) }}</td><td class="text-right">৳{{ number_format($row['total_discount'] ?? 0, 0) }}</td><td class="text-center">{{ number_format($row['total_order']) }}</td></tr>
+            @forelse($dataRows as $order)
+                @php
+                    $previewItems = $order->orderDetails->take(2)->pluck('product_name')->implode(', ');
+                    $remaining = $order->orderDetails->count() - 2;
+                    $discountAmount = max(0, (float)($order->discount_amount ?? 0));
+                    $serviceCharge = max(0, (float)($order->service_charge ?? 0));
+                    $tipsAmount = max(0, (float)($order->tips_amount ?? 0));
+                    $givenMoney = max(0, (float)($order->given_money ?? 0));
+                    $changeAmount = max(0, (float)($order->change_amount ?? 0));
+                    $orderType = strtolower((string) $order->order_type);
+                    $tableText = in_array($orderType, ['takeaway', 'delivery'], true) ? ucfirst($orderType) : 'Table T-' . (optional($order->table)->table_number ?? 'N/A');
+
+                    $paymentText = $order->payment_type ?? 'N/A';
+                    if ($paymentText === 'Split') {
+                        $splits = [];
+                        if((float)$order->paid_in_cash > 0) $splits[] = 'Cash: ' . number_format($order->paid_in_cash, 0);
+                        if((float)$order->paid_in_card > 0) $splits[] = 'Card: ' . number_format($order->paid_in_card, 0);
+                        if((float)$order->paid_in_mfc > 0) $splits[] = 'MFC: ' . number_format($order->paid_in_mfc, 0);
+                        $paymentText .= count($splits) ? '<br><span style="font-size:8px;color:#555;">' . implode(', ', $splits) . '</span>' : '';
+                    }
+                @endphp
+                <tr>
+                    <td><strong>#{{ $order->order_number }}</strong></td>
+                    <td>
+                        <strong>{{ optional($order->customer)->name ?? 'Walk-in' }}</strong><br>
+                        <span style="font-size:8px; color:#555;">{{ $tableText }}</span>
+                    </td>
+                    <td>
+                        <span>{{ $previewItems ?: '—' }}</span>
+                        @if($remaining > 0)
+                            <br><span style="font-size:8px; color:#555; font-weight:bold;">+{{ $remaining }} more item(s)</span>
+                        @endif
+                    </td>
+                    <td class="text-right">৳{{ number_format($order->subtotal, 0) }}</td>
+                    <td class="text-right" style="color: red;">৳{{ number_format($discountAmount, 0) }}</td>
+                    <td class="text-right">৳{{ number_format($serviceCharge, 0) }}</td>
+                    <td class="text-right" style="color: green;">৳{{ number_format($tipsAmount, 0) }}</td>
+                    <td class="text-right">৳{{ number_format($givenMoney, 0) }}</td>
+                    <td class="text-right" style="color: green;">৳{{ number_format($changeAmount, 0) }}</td>
+                    <td class="text-right"><strong>৳{{ number_format($order->grand_total, 0) }}</strong></td>
+                    <td>{!! $paymentText !!}</td>
+                    <td>{{ $order->status }}</td>
+                    <td>{{ optional($order->created_at)->format('d M y, h:iA') }}</td>
+                    <td>{{ is_null($order->kitchen_to_payment_minutes) ? '—' : $order->kitchen_to_payment_minutes . ' min' }}</td>
+                </tr>
             @empty
-                <tr><td colspan="5" class="text-center">No sales/order data found.</td></tr>
+                <tr>
+                    <td colspan="14" class="text-center py-4">No completed orders found for the selected filter.</td>
+                </tr>
             @endforelse
             </tbody>
-            <tfoot><tr><th colspan="2" class="text-right">Total</th><th class="text-right">৳{{ number_format($periodTotalSale ?? 0, 0) }}</th><th class="text-right">৳{{ number_format($periodTotalDiscount ?? 0, 0) }}</th><th class="text-center">{{ number_format($periodTotalOrder ?? 0) }}</th></tr></tfoot>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-right">Total ({{ $dataRows->count() }} Orders)</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('subtotal'), 0) }}</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('discount_amount'), 0) }}</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('service_charge'), 0) }}</th>
+                    <th class="text-right">৳{{ number_format($dataRows->sum('tips_amount'), 0) }}</th>
+                    <th colspan="2"></th>
+                    <th class="text-right">৳{{ number_format($periodTotalSale, 0) }}</th>
+                    <th colspan="4"></th>
+                </tr>
+            </tfoot>
         </table>
     @endif
 

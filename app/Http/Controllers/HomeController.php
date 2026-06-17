@@ -16,6 +16,109 @@ class HomeController extends Controller
         $this->middleware('auth');
     }
 
+    private function dashboardChartPayload(string $period = '7'): array
+    {
+        $period = in_array($period, ['7', '30', '12m'], true) ? $period : '7';
+
+        $chartLabels = [];
+        $chartData = [];
+
+        if ($period === '12m') {
+            $startMonth = Carbon::now()->subMonths(11)->startOfMonth();
+            $salesRows = Order::query()
+                ->where('status', 'Completed')
+                ->whereBetween('created_at', [$startMonth, Carbon::now()->endOfMonth()])
+                ->select(
+                    DB::raw('YEAR(created_at) as sales_year'),
+                    DB::raw('MONTH(created_at) as sales_month'),
+                    DB::raw('SUM(grand_total) as total_revenue')
+                )
+                ->groupBy('sales_year', 'sales_month')
+                ->get();
+
+            for ($i = 0; $i < 12; $i++) {
+                $date = $startMonth->copy()->addMonths($i);
+                $row = $salesRows
+                    ->where('sales_year', (int) $date->format('Y'))
+                    ->where('sales_month', (int) $date->format('m'))
+                    ->first();
+
+                $chartLabels[] = $date->format('M y');
+                $chartData[] = $row ? round((float) $row->total_revenue, 2) : 0;
+            }
+        } else {
+            $days = (int) $period;
+            $startDate = Carbon::today()->subDays($days - 1);
+            $salesRows = Order::query()
+                ->where('status', 'Completed')
+                ->whereBetween('created_at', [$startDate->copy()->startOfDay(), Carbon::today()->endOfDay()])
+                ->select(DB::raw('DATE(created_at) as sales_date'), DB::raw('SUM(grand_total) as total_revenue'))
+                ->groupBy('sales_date')
+                ->get();
+
+            for ($i = $days - 1; $i >= 0; $i--) {
+                $date = Carbon::today()->subDays($i);
+                $row = $salesRows->where('sales_date', $date->format('Y-m-d'))->first();
+
+                $chartLabels[] = $days <= 7 ? $date->format('D') : $date->format('d M');
+                $chartData[] = $row ? round((float) $row->total_revenue, 2) : 0;
+            }
+        }
+
+        // Order Status chart data must come from the current month's orders.
+        // Preferred statuses are shown first, and any custom DB status is also included.
+        $orderStatuses = Order::query()
+            ->whereYear('created_at', Carbon::now()->year)
+            ->whereMonth('created_at', Carbon::now()->month)
+            ->select('status', DB::raw('COUNT(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+
+        $preferredStatusLabels = ['Pending', 'Processing', 'Cooking', 'Ready', 'Completed', 'Delivered', 'Cancelled'];
+        $extraStatusLabels = collect(array_keys($orderStatuses))
+            ->filter(fn ($status) => $status && !in_array($status, $preferredStatusLabels, true))
+            ->values()
+            ->toArray();
+
+        $statusLabels = collect(array_merge($preferredStatusLabels, $extraStatusLabels))
+            ->filter(fn ($status) => (int) ($orderStatuses[$status] ?? 0) > 0)
+            ->values()
+            ->toArray();
+
+        if (empty($statusLabels)) {
+            $statusLabels = ['Pending', 'Cooking', 'Ready', 'Completed', 'Cancelled'];
+        }
+
+        $statusData = array_map(fn ($status) => (int) ($orderStatuses[$status] ?? 0), $statusLabels);
+
+        $currentYear = Carbon::now()->year;
+        $topItems = OrderDetail::query()
+            ->join('orders', 'order_details.order_id', '=', 'orders.id')
+            ->where('orders.status', 'Completed')
+            ->whereYear('orders.created_at', $currentYear)
+            ->select('order_details.product_name', DB::raw('SUM(order_details.quantity) as total_qty'))
+            ->groupBy('order_details.product_name')
+            ->orderByDesc('total_qty')
+            ->take(5)
+            ->get();
+
+        return [
+            'period' => $period,
+            'chartLabels' => $chartLabels,
+            'chartData' => $chartData,
+            'statusLabels' => $statusLabels,
+            'statusData' => $statusData,
+            'topItemsLabels' => $topItems->pluck('product_name')->toArray(),
+            'topItemsData' => $topItems->pluck('total_qty')->map(fn ($qty) => (int) $qty)->toArray(),
+        ];
+    }
+
+    public function chartData(Request $request)
+    {
+        return response()->json($this->dashboardChartPayload((string) $request->get('period', '7')));
+    }
+
     public function index()
     {
         $today = Carbon::today();
@@ -25,102 +128,56 @@ class HomeController extends Controller
         $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
         $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth();
 
-        // ১. Today's Sales & vs Yesterday
         $todaySales = Order::whereDate('created_at', $today)->where('status', 'Completed')->sum('grand_total');
         $yesterdaySales = Order::whereDate('created_at', $yesterday)->where('status', 'Completed')->sum('grand_total');
         $salesChange = $yesterdaySales > 0 ? (($todaySales - $yesterdaySales) / $yesterdaySales) * 100 : ($todaySales > 0 ? 100 : 0);
 
-        // ২. Monthly Revenue & vs Last Month
         $monthlySales = Order::whereBetween('created_at', [$thisMonthStart, $thisMonthEnd])->where('status', 'Completed')->sum('grand_total');
         $lastMonthSales = Order::whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->where('status', 'Completed')->sum('grand_total');
         $monthlyChange = $lastMonthSales > 0 ? (($monthlySales - $lastMonthSales) / $lastMonthSales) * 100 : ($monthlySales > 0 ? 100 : 0);
 
-        // ৩. Total Orders (Today) & vs Yesterday
         $todayOrdersCount = Order::whereDate('created_at', $today)->count();
         $yesterdayOrdersCount = Order::whereDate('created_at', $yesterday)->count();
         $ordersChange = $todayOrdersCount - $yesterdayOrdersCount;
 
-        // ৪. Running Tables
         $totalTables = Table::count();
-        $runningTables = Table::whereHas('orders', function($q) {
-            $q->whereIn('status', ['Pending', 'Cooking']);
+        $runningTables = Table::whereHas('orders', function ($query) {
+            $query->whereIn('status', ['Pending', 'Cooking']);
         })->count();
         $availableTables = $totalTables - $runningTables;
 
-        // ৫. Revenue Chart Data (Last 7 Days)
-        $chartLabels = [];
-        $chartData = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::today()->subDays($i);
-            $chartLabels[] = $date->format('D'); // Mon, Tue, etc.
-            $chartData[] = Order::whereDate('created_at', $date)->where('status', 'Completed')->sum('grand_total');
-        }
+        $chartPayload = $this->dashboardChartPayload('7');
+        extract($chartPayload);
 
-        // ৬. Order Status Donut Chart (This Month)
-        $orderStatuses = Order::whereMonth('created_at', Carbon::now()->month)
-                            ->select('status', DB::raw('count(*) as total'))
-                            ->groupBy('status')
-                            ->pluck('total', 'status')->toArray();
-
-        $statusLabels = ['Pending', 'Cooking', 'Ready', 'Completed', 'Cancelled'];
-        $statusData = [
-            $orderStatuses['Pending'] ?? 0,
-            $orderStatuses['Cooking'] ?? 0,
-            $orderStatuses['Ready'] ?? 0,
-            $orderStatuses['Completed'] ?? 0,
-            $orderStatuses['Cancelled'] ?? 0,
-        ];
-
-        // ৭. Top Selling Items Chart (This Year)
-        // Food Wise Sales report-এর একই logic: only Completed orders + current year + qty sum.
-   // ৭. Top Selling Items Chart (This Year) - ফুড রিপোর্ট পেজের হুবহু একই কুয়েরি লজিক
-        // ৭. Top Selling Items Chart (This Year) - ফুড রিপোর্টের হুবহু র-লজিক ফিক্স
-        $currentYear = \Carbon\Carbon::now()->year;
-
-        $foodRowsFromReport = OrderDetail::query()
-            ->join('orders', 'order_details.order_id', '=', 'orders.id')
-            ->where('orders.status', 'Completed')
-            ->whereYear('orders.created_at', $currentYear) // ফুড রিপোর্টের মত ডিরেক্ট Year চেক
-            ->select(
-                'order_details.product_name',
-                DB::raw('SUM(order_details.quantity) as total_qty')
-            )
-            ->groupBy('order_details.product_name')
-            ->orderByRaw('SUM(order_details.quantity) DESC') // র-অর্ডার ডিসেন্ডিং
-            ->take(5)
-            ->get();
-
-        $topItemsLabels = $foodRowsFromReport->pluck('product_name')->toArray();
-        $topItemsData = $foodRowsFromReport->pluck('total_qty')->map(function ($qty) {
-            return (int) $qty;
-        })->toArray();
-
-        //dd($topItemsLabels, $topItemsData);
-
-
-//dd(1);
-        // ৮. Kitchen Queue (Pending / Cooking / Ready)
         $kitchenQueue = Order::with(['table', 'orderDetails'])
             ->whereIn('status', ['Pending', 'Cooking', 'Ready'])
             ->orderBy('id', 'asc')
             ->limit(5)
             ->get();
 
-        // ৯. Recent Orders
-        $recentOrders = Order::with(['table', 'waiter'])
+        $recentOrders = Order::with(['table', 'waiter', 'orderDetails'])
             ->orderBy('id', 'desc')
             ->limit(6)
             ->get();
 
         return view('admin.dashboard.index', compact(
-            'todaySales', 'salesChange',
-            'monthlySales', 'monthlyChange',
-            'todayOrdersCount', 'ordersChange',
-            'totalTables', 'runningTables', 'availableTables',
-            'chartLabels', 'chartData',
-            'statusLabels', 'statusData',
-            'topItemsLabels', 'topItemsData',
-            'kitchenQueue', 'recentOrders'
+            'todaySales',
+            'salesChange',
+            'monthlySales',
+            'monthlyChange',
+            'todayOrdersCount',
+            'ordersChange',
+            'totalTables',
+            'runningTables',
+            'availableTables',
+            'chartLabels',
+            'chartData',
+            'statusLabels',
+            'statusData',
+            'topItemsLabels',
+            'topItemsData',
+            'kitchenQueue',
+            'recentOrders'
         ));
     }
 }

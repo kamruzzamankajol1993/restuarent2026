@@ -60,7 +60,7 @@
                         <strong style="color: var(--progga-primary);">Split Breakdown:</strong><br>
                         Cash: <span style="font-weight:700;">৳{{ number_format($order->paid_in_cash, 0) }}</span> <br>
                         Card: <span style="font-weight:700;">৳{{ number_format($order->paid_in_card, 0) }}</span> <br>
-                        MFC: <span style="font-weight:700;">৳{{ number_format($order->paid_in_mfc, 0) }}</span>
+                        MFS: <span style="font-weight:700;">৳{{ number_format($order->paid_in_mfc, 0) }}</span>
                     </div>
                 @endif
             </div>

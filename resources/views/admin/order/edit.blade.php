@@ -357,7 +357,7 @@
                                value="{{ old('total_paid_amount', $order->total_paid_amount ?? 0) }}"
                                min="0"
                                step="0.01">
-                        <div class="payment-helper-text">Cash/Card/Mobile Banking হলে শুধু এই Total Paid input ব্যবহার হবে।</div>
+                        <div class="payment-helper-text">Cash/Card/Mobile Banking will use this Total Paid input.</div>
                     </div>
 
                     <div class="split-payment-box" id="splitPaymentBox">
@@ -375,18 +375,18 @@
                                 <input type="number" name="paid_in_mfc" id="paidInMfc" class="form-control split-input" value="{{ old('paid_in_mfc', $order->paid_in_mfc ?? 0) }}" min="0" step="0.01">
                             </div>
                         </div>
-                        <div class="payment-helper-text">Split হলে শুধু Cash + Card + Mobile Banking আলাদা ৩টা input থাকবে। Total Paid auto sum হবে।</div>
+                        <div class="payment-helper-text">Split will use Cash + Card + Mobile Banking inputs. Total Paid will be auto-summed.</div>
                     </div>
 
                     <div class="mt-3 transaction-id-box" id="transactionIdBox">
-                        <label class="form-label fw-bold" style="font-size:12px;">Transaction ID</label>
+                        <label class="form-label fw-bold" style="font-size:12px;">Transaction / Reference No</label>
                         <input type="text"
                                name="transaction_id"
                                id="transactionIdInput"
                                class="form-control"
                                value="{{ old('transaction_id', $order->transaction_id) }}"
-                               placeholder="Mobile Banking transaction ID">
-                        <div class="payment-helper-text">Transaction ID শুধু Mobile Banking payment type হলে দেখাবে।</div>
+                               placeholder="Card auth / TXN / Reference no">
+                        <div class="payment-helper-text">This field shows only for Card or Mobile Banking payment.</div>
                     </div>
 
                     <div class="row g-2 mt-3">
@@ -488,15 +488,15 @@
     }
 
     /**
-     * Payment type change হলে শুধু এই function input show/hide control করবে।
-     * Quantity plus/minus অথবা discount calculation-এর উপর payment UI আর depend করবে না।
+     * Payment type change controls input show/hide only.
+     * Quantity plus/minus or discount calculation will not control payment UI.
      */
     function syncPaymentFields() {
         if (!paymentMethod) return;
 
         const selectedPayment = paymentMethod.value;
         const isSplit = selectedPayment === 'Split';
-        const isMobileBanking = selectedPayment === 'Mobile Banking';
+        const showReferenceField = selectedPayment === 'Card' || selectedPayment === 'Mobile Banking';
 
         // Cash/Card/Mobile Banking => Total Paid input show.
         // Split => Total Paid input hide, ৩টা আলাদা paid input show.
@@ -511,10 +511,13 @@
             input.disabled = !isSplit;
         });
 
-        // Transaction ID শুধু Mobile Banking payment type হলে show হবে।
-        setBoxVisible(transactionIdBox, isMobileBanking);
+        // Transaction / Reference No shows only for Card or Mobile Banking.
+        setBoxVisible(transactionIdBox, showReferenceField);
         if (transactionIdInput) {
-            transactionIdInput.disabled = !isMobileBanking;
+            transactionIdInput.disabled = !showReferenceField;
+            if (!showReferenceField) {
+                transactionIdInput.value = '';
+            }
         }
     }
 

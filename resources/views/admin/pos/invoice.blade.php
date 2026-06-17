@@ -149,6 +149,17 @@
       text-transform: uppercase; letter-spacing: .5px; font-family: var(--mono);
     }
     .bill-payment-val { font-size: 13px; font-weight: 900; color: #000; font-family: var(--mono); }
+    .bill-payment-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 12px; margin-bottom: 6px;
+    }
+    .bill-payment-metric { text-align: right; }
+    .bill-payment-change {
+      display: flex; justify-content: flex-end;
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1.5px dashed #000;
+    }
+    .bill-payment-change .bill-payment-metric { min-width: 110px; }
 
     .bill-server {
       text-align: center; font-size: 11.5px; color: #000;
@@ -329,7 +340,7 @@
 
       @if(($order->payment_type ?? 'Cash') === 'Split')
         <div class="bill-payment" style="display:block;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <div class="bill-payment-top">
             <div>
               <div class="bill-payment-label">Paid By</div>
               <div class="bill-payment-val">Split</div>
@@ -341,17 +352,24 @@
           </div>
           <div class="bill-total-row"><span>Cash</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_cash ?? $order->paid_in_cash ?? 0, 0) }}</span></div>
           <div class="bill-total-row"><span>Card</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_card ?? $order->paid_in_card ?? 0, 0) }}</span></div>
-          <div class="bill-total-row"><span>MFC / Mobile</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_mfc ?? $order->paid_in_mfc ?? 0, 0) }}</span></div>
-          @if(($order->change_amount ?? 0) > 0)
-            <div class="bill-total-row"><span>Change</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->change_amount, 0) }}</span></div>
-          @endif
+          <div class="bill-total-row"><span>MFS/ Mobile</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_mfc ?? $order->paid_in_mfc ?? 0, 0) }}</span></div>
+
+
+            <div class="bill-payment-change">
+              <div class="bill-payment-metric">
+                <div class="bill-payment-label">Change</div>
+                <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->change_amount, 0) }}</div>
+              </div>
+            </div>
+
+
           @if(($order->due ?? 0) > 0)
             <div class="bill-total-row"><span>Due</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->due, 0) }}</span></div>
           @endif
         </div>
       @else
         <div class="bill-payment" style="display:block;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <div class="bill-payment-top">
             <div>
               <div class="bill-payment-label">Paid By</div>
               <div class="bill-payment-val">{{ $order->payment_type ?? 'Cash' }}</div>
@@ -361,9 +379,16 @@
               <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->total_paid_amount ?? 0, 0) }}</div>
             </div>
           </div>
-          @if(($order->change_amount ?? 0) > 0)
-            <div class="bill-total-row"><span>Change</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->change_amount, 0) }}</span></div>
-          @endif
+
+
+            <div class="bill-payment-change">
+              <div class="bill-payment-metric">
+                <div class="bill-payment-label">Change</div>
+                <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->change_amount, 0) }}</div>
+              </div>
+            </div>
+
+
           @if(($order->due ?? 0) > 0)
             <div class="bill-total-row"><span>Due</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->due, 0) }}</span></div>
           @endif

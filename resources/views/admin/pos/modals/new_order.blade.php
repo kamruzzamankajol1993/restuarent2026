@@ -39,7 +39,7 @@
                   </option>
                 @endforeach
               </select>
-              <small class="text-muted d-block mt-1">Dine-In order এর জন্য available table select করা বাধ্যতামূলক। Occupied/Reserved table select করা যাবে না।</small>
+              <small class="text-muted d-block mt-1">Available table selection is required for Dine-In orders. Occupied or Reserved tables cannot be selected.</small>
             </div>
 
             <div class="text-center p-3 mb-3 rounded" id="modalTableDisplaySection" style="display:none;background: rgba(213, 170, 101, 0.1); border: 1px dashed var(--progga-secondary);">
@@ -112,7 +112,7 @@
               <div class="pos-walkin-row" style="border: 1px dashed #198754; background: rgba(25, 135, 84, 0.06);">
                 <div class="pos-walkin-row-text">
                   <strong><i class="bi bi-gift-fill text-success me-1"></i>Complimentary Order</strong>
-                  <small>On করলে এই order-এর সব food/addon price 0 হবে।</small>
+                  <small>Turn this on to make all food and addon prices 0 for this order.</small>
                 </div>
                 <label class="progga-toggle">
                   <input type="checkbox" id="posComplimentaryOrder" name="is_complimentary_order" value="1">

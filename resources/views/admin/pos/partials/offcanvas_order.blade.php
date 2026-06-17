@@ -36,7 +36,7 @@
            @foreach($kot->orderDetails as $item)
                 @php $addons = json_decode($item->addons, true) ?? []; @endphp
 
-                {{-- Unavailable হলে opacity কমিয়ে দেওয়া হবে --}}
+                {{-- POS UI note. --}}
                 <div class="progga-oc-item {{ $item->is_unavailable ? 'opacity-50' : '' }}">
                     <span class="progga-oc-item-name">
 
@@ -145,7 +145,7 @@
                     $payItems = [];
                     foreach($order->kots as $kot) {
                         foreach($kot->orderDetails as $item) {
-                            // শুধুমাত্র Available আইটেমগুলো পেমেন্ট মোডালে যাবে
+                            // POS workflow note.
                             if(!$item->is_unavailable) {
                                 $payItems[] = [
                                     'name' => $item->product_name,

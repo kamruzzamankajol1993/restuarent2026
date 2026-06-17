@@ -1,8 +1,93 @@
+<style>
+  .progga-pos-cats {
+    overflow: visible !important;
+  }
+  .progga-pos-cat-item {
+    position: relative;
+    overflow: visible !important;
+  }
+  .progga-pos-cat-name {
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    line-height: 1.18 !important;
+  }
+  .progga-pos-cat-item::after {
+    content: attr(data-category-name);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    min-width: 120px;
+    max-width: 280px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    background: var(--progga-primary, #21352a);
+    color: #fff;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, .22);
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.25;
+    white-space: normal;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 99999;
+    transition: opacity .14s ease, transform .14s ease, visibility .14s ease;
+  }
+  .progga-pos-cat-item::before {
+    content: '';
+    position: absolute;
+    left: calc(100% + 5px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-right: 7px solid var(--progga-primary, #21352a);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 99999;
+    transition: opacity .14s ease, transform .14s ease, visibility .14s ease;
+  }
+  .progga-pos-cat-item:hover::after,
+  .progga-pos-cat-item:hover::before,
+  .progga-pos-cat-item:focus-within::after,
+  .progga-pos-cat-item:focus-within::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+  }
+  @media (max-width: 991.98px) {
+    .progga-pos-cat-item::after {
+      left: 50%;
+      top: calc(100% + 10px);
+      transform: translateX(-50%) translateY(-6px);
+      max-width: 220px;
+      text-align: center;
+    }
+    .progga-pos-cat-item::before {
+      left: 50%;
+      top: calc(100% + 3px);
+      transform: translateX(-50%) translateY(-6px) rotate(90deg);
+    }
+    .progga-pos-cat-item:hover::after,
+    .progga-pos-cat-item:hover::before,
+    .progga-pos-cat-item:focus-within::after,
+    .progga-pos-cat-item:focus-within::before {
+      transform: translateX(-50%) translateY(0);
+    }
+    .progga-pos-cat-item:hover::before,
+    .progga-pos-cat-item:focus-within::before {
+      transform: translateX(-50%) translateY(0) rotate(90deg);
+    }
+  }
+</style>
+
 <div class="progga-pos-screen progga-pos-order-screen" id="posStep2">
     <div class="progga-pos-cats" id="posCatList">
-      <div class="progga-pos-cat-item active" data-cat-id=""><div class="progga-pos-cat-emoji">🍽️</div><div class="progga-pos-cat-name">All Items</div></div>
+      <div class="progga-pos-cat-item active" data-cat-id="" data-category-name="All Items"><div class="progga-pos-cat-emoji">🍽️</div><div class="progga-pos-cat-name">All Items</div></div>
       @foreach($categories as $cat)
-      <div class="progga-pos-cat-item" data-cat-id="{{ $cat->id }}"><div class="progga-pos-cat-emoji">🥘</div><div class="progga-pos-cat-name">{{ $cat->name }}</div></div>
+      <div class="progga-pos-cat-item" data-cat-id="{{ $cat->id }}" data-category-name="{{ $cat->name }}"><div class="progga-pos-cat-emoji">🥘</div><div class="progga-pos-cat-name">{{ $cat->name }}</div></div>
       @endforeach
     </div>
 

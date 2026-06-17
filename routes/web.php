@@ -36,6 +36,7 @@ Route::get('/clear', function() {
 Auth::routes(['reset' => false]);
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::get('/dashboard/chart-data', [App\Http\Controllers\HomeController::class, 'chartData'])->name('dashboard.chart_data');
 Route::get('/download-pdf', [PDFController::class, 'generatePDF']);
 Route::get('/admin/login', [LoginController::class, 'showLoginForm'])->name('admin.login');
 
@@ -85,6 +86,7 @@ Route::get('/refresh-csrf-token', function () {
     Route::get('reports/payment-type-wise-sales', [App\Http\Controllers\Admin\ReportController::class, 'paymentTypeSales'])->name('reports.payment_type_sales');
     Route::get('reports/food-wise-sales', [App\Http\Controllers\Admin\ReportController::class, 'foodSales'])->name('reports.food_sales');
     Route::get('reports/export/pdf', [App\Http\Controllers\Admin\ReportController::class, 'exportPdf'])->name('reports.export.pdf');
+    Route::get('reports/export/excel', [App\Http\Controllers\Admin\ReportController::class, 'exportExcel'])->name('reports.export.excel');
     Route::get('reports/export/csv', [App\Http\Controllers\Admin\ReportController::class, 'exportCsv'])->name('reports.export.csv');
 
 // ==========================================

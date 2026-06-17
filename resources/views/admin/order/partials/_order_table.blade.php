@@ -83,7 +83,7 @@
                     <span style="font-size: 10px; font-weight: normal; color: #555;">
                         @if($order->paid_in_cash > 0) Cash: {{ $order->paid_in_cash }} @endif
                         @if($order->paid_in_card > 0) Card: {{ $order->paid_in_card }} @endif
-                        @if($order->paid_in_mfc > 0) MFC: {{ $order->paid_in_mfc }} @endif
+                        @if($order->paid_in_mfc > 0) MFS: {{ $order->paid_in_mfc }} @endif
                     </span>
                 @endif
               </span>

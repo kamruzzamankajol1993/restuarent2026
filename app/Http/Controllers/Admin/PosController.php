@@ -1012,7 +1012,7 @@ public function placeOrder(Request $request)
             $order->service_charge    = $service_charge;
             $order->grand_total       = $grand_total;
             $order->payment_type      = $paymentMethod;
-            $order->transaction_id    = $paymentMethod == 'Mobile Banking' ? $request->transaction_id : null;
+            $order->transaction_id    = in_array($paymentMethod, ['Card', 'Mobile Banking'], true) ? $request->transaction_id : null;
             $order->status            = 'Completed'; // স্ট্যাটাস ১০০% আপডেট হবে
             $order->due               = $due;
             $order->total_paid_amount = $totalPaid;

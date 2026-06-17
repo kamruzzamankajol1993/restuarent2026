@@ -51,6 +51,14 @@
       box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.14);
     }
 
+
+
+    .progga-pos-cat-name {
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      font-weight: 900 !important;
+    }
+
     @media (max-width: 767.98px) {
       .progga-session-status {
         padding: 6px 9px;
@@ -282,7 +290,7 @@
     setInterval(updatePosSessionTimer, 60000);
 
     $(document).ready(function() {
-        // বাটন টেক্সট পরিবর্তন
+        // POS workflow note.
         if(isWaiter) {
             $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Front Desk');
         }
@@ -299,8 +307,8 @@
 
 
     let newOrderModalMode = 'all';
-    // Start Order বাটন দিয়ে modal hide করলে current order state reset করা যাবে না।
-    // কিন্তু close/cancel করলে modal এবং selected table clean করা হবে।
+    // POS workflow note.
+    // POS workflow note.
     let newOrderStartedFromModal = false;
 
     function resetNewOrderModalCommon() {
@@ -346,7 +354,7 @@
         $('#posTypeDineIn').prop('checked', true);
         $('#posTypeTakeaway, #posTypeDelivery').prop('checked', false);
 
-        // Modal close করলে select value এবং UI দুইটাই reset হবে।
+        // POS workflow note.
         $('#modalTableSelect').val('').trigger('change');
         $('#modalSelectedTableNum').text('T-00');
         $('#modalTableSelectSection').show();
@@ -356,7 +364,7 @@
     }
 
     $('#newOrderModal').on('hidden.bs.modal', function () {
-        // Start Order দিয়ে hide হলে reset করা যাবে না, কারণ এরপর POS Step-2 currentOrder ব্যবহার করে।
+        // POS workflow note.
         if (newOrderStartedFromModal) {
             newOrderStartedFromModal = false;
             return;
@@ -424,7 +432,7 @@
 
         if($(this).hasClass('occupied')) {
             $.get("{{ route('pos.get_table_order', ':id') }}".replace(':id', tId), function(res) {
-                // নতুন লজিক: ফ্রন্ট ডেস্ক ক্লিক করলে কার্টে লোড হবে
+                // POS workflow note.
                 if(res.status === 'load_cart') {
                     window.loadHeldQrOrderToPos(res.order_data);
                 } else if(res.status === 'error') {
@@ -616,14 +624,14 @@
         $.get("{{ route('pos.cart.get') }}", getCartParams(), function(res) {
             $('#posCartBody').html(res);
 
-            // Quantity update/remove এর পর cart list যেন auto-scroll হয়ে উপরে না যায়
-            // DOM replace হওয়ার পর browser কখনও delayed scroll করে, তাই কয়েকবার restore করা হলো
+            // POS workflow note.
+            // POS workflow note.
             restoreCartScrollPosition();
             requestAnimationFrame(restoreCartScrollPosition);
             setTimeout(restoreCartScrollPosition, 0);
             setTimeout(restoreCartScrollPosition, 80);
 
-            // নতুন লাইন: কার্ট লোড হওয়ার পর বাটন টেক্সট আপডেট
+            // POS workflow note.
             if(isWaiter) {
                 $('#btnSendToKitchen').html('<i class="bi bi-send"></i> Send to Front Desk');
             } else {
@@ -745,10 +753,13 @@
     }
 
     $(document).on('change', 'input[name="payment_method"]', function() {
-        if($(this).val() === 'Card' || $(this).val() === 'Mobile Banking') {
-            $('#transactionDiv').slideDown('fast');
+        // Keep reference field visible for Card and Mobile Banking payment.
+        if (typeof window.syncFinalPaymentFields === 'function') {
+            window.syncFinalPaymentFields();
+        } else if ($(this).val() === 'Card' || $(this).val() === 'Mobile Banking') {
+            $('#transactionDiv').slideDown('fast').find('input[name="transaction_id"]').prop('disabled', false);
         } else {
-            $('#transactionDiv').slideUp('fast');
+            $('#transactionDiv').slideUp('fast').find('input[name="transaction_id"]').prop('disabled', true).val('');
         }
     });
 
@@ -760,7 +771,7 @@
             return;
         }
 
-        // রোল অনুযায়ী টাইটেল ও টেক্সট সেট করা
+        // POS workflow note.
         let alertTitle = isWaiter ? 'Send to Front Desk?' : 'Send to Kitchen?';
         let confirmBtnText = isWaiter ? 'Yes, Send to Front Desk!' : 'Yes, Send!';
 
@@ -846,7 +857,7 @@
     window.syncFinalPaymentFields = function() {
         let method = $('input[name="payment_method"]:checked').val() || 'Cash';
         let isSplit = method === 'Split';
-        let isMobileBanking = method === 'Mobile Banking';
+        let showReferenceField = method === 'Card' || method === 'Mobile Banking';
 
         $('#normalPaidRow').css('display', isSplit ? 'none' : 'flex');
         $('#splitPaidDisplayRow').css('display', isSplit ? 'flex' : 'none');
@@ -854,8 +865,12 @@
         $('#payTotalPaidAmount').prop('disabled', isSplit);
         $('#splitCash, #splitCard, #splitMfc').prop('disabled', !isSplit);
 
-        $('#transactionDiv').toggle(isMobileBanking);
-        $('#transactionDiv').find('input[name="transaction_id"]').prop('disabled', !isMobileBanking);
+        $('#transactionDiv').toggle(showReferenceField);
+        $('#transactionDiv').find('input[name="transaction_id"]').prop('disabled', !showReferenceField);
+
+        if (!showReferenceField) {
+            $('#transactionDiv').find('input[name="transaction_id"]').val('');
+        }
     };
 
     window.getFinalPaymentBillPaid = function() {
@@ -934,6 +949,13 @@
         calculateModalTotal();
         window.resetFinalPaymentDefaults(posPaymentNumber($('#payTotalAmount').text()));
         bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show();
+
+        // Re-sync after Bootstrap finishes showing the modal, so Card/Mobile reference field cannot be hidden by older handlers.
+        setTimeout(function () {
+            if (typeof window.syncFinalPaymentFields === 'function') {
+                window.syncFinalPaymentFields();
+            }
+        }, 80);
     }
 
     window.calculateModalTotal = function() {
@@ -1199,26 +1221,26 @@
         $('body').removeClass('progga-pos-overflow-lock');
     });
 
-    // ১. Edit বাটনে ক্লিক করলে List হাইড হয়ে Edit ফর্ম ওপেন হবে
+    // POS workflow note.
     $(document).on('click', '.btnEditSession', function(e) {
         e.preventDefault();
 
         let sessionId = $(this).attr('data-id');
-        let sessionStatus = $(this).attr('data-status').trim(); // স্পেস রিমুভ করা হলো
+        let sessionStatus = $(this).attr('data-status').trim(); // POS workflow note.
 
         $('#sessionModalTitle').html('<i class="bi bi-pencil-square me-2"></i>Edit Session #' + sessionId);
         $('#inlineEditSessionId').val(sessionId);
         $('#inlineEditStartTime').val($(this).attr('data-start'));
         $('#inlineEditEndTime').val($(this).attr('data-end'));
 
-        // স্ট্যাটাস ভ্যালু সেট করে ট্রিগার করা হলো
+        // POS workflow note.
         $('#inlineEditStatus').val(sessionStatus).trigger('change');
 
         $('#sessionListView').hide();
         $('#sessionEditView').fadeIn('fast');
     });
 
-    // ২. Back বাটনে ক্লিক করলে আবার List এ ফেরত যাবে
+    // POS workflow note.
     $(document).on('click', '#btnCancelEdit', function(e) {
         e.preventDefault();
         $('#sessionModalTitle').html('<i class="bi bi-table me-2"></i>Work Period Sessions');
@@ -1226,7 +1248,7 @@
         $('#sessionListView').fadeIn('fast');
     });
 
-    // ৩. এডিট ফর্ম সাবমিট করা
+    // POS workflow note.
     $('#inlineEditSessionForm').on('submit', function(e) {
         e.preventDefault();
         let formData = $(this).serialize();
@@ -1247,7 +1269,7 @@
         });
     });
 
-    // ৪. মোডাল ক্লোজ হলে ভিউ রিসেট করে ডিফল্ট List এ নিয়ে আসা
+    // POS workflow note.
     $('#sessionHistoryModal').on('hidden.bs.modal', function () {
         $('#sessionModalTitle').html('<i class="bi bi-table me-2"></i>Work Period Sessions');
         $('#sessionEditView').hide();

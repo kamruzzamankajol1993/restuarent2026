@@ -689,16 +689,16 @@ $('#btnHoldQrOrder').on('click', function() {
 <script>
 // Dynamic Export Script for Ajax Filters
 function exportReport(type, reportName) {
-    // URL জেনারেট করা (PDF বা CSV এর জন্য)
-    let baseUrl = (type === 'pdf') ? "{{ route('reports.export.pdf') }}" : "{{ route('reports.export.csv') }}";
+    let baseUrl = "{{ route('reports.export.csv') }}";
 
-    // ফিল্টার ফর্ম থেকে কারেন্ট সিলেক্টেড ডেটাগুলো নেওয়া
+    if (type === 'pdf') {
+        baseUrl = "{{ route('reports.export.pdf') }}";
+    } else if (type === 'excel') {
+        baseUrl = "{{ route('reports.export.excel') }}";
+    }
+
     let formData = $('#reportFilterForm').serialize();
-
-    // রিপোর্ট নাম এবং ফিল্টার ডেটা দিয়ে ফুল URL তৈরি করা
-    let exportUrl = baseUrl + "?report=" + reportName + "&" + formData;
-
-    // নতুন ট্যাবে পিডিএফ বা সিএসভি ডাউনলোড শুরু করা
+    let exportUrl = baseUrl + "?report=" + encodeURIComponent(reportName) + "&" + formData;
     window.open(exportUrl, '_blank');
 }
 </script>

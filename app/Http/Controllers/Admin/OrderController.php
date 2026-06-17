@@ -379,8 +379,8 @@ class OrderController extends Controller
             $order->service_charge = $serviceCharge;
             $order->grand_total = $grandTotal;
             $order->payment_type = $paymentMethod;
-            // Transaction ID শুধু Mobile Banking payment হলে রাখা হবে। অন্য payment type হলে পুরনো transaction ID clear হবে।
-            $order->transaction_id = $paymentMethod === 'Mobile Banking' ? $request->transaction_id : null;
+            // Transaction / Reference No will be stored only for Card or Mobile Banking. Other payment types will clear it.
+            $order->transaction_id = in_array($paymentMethod, ['Card', 'Mobile Banking'], true) ? $request->transaction_id : null;
             $order->total_paid_amount = $totalPaid;
             $order->paid_in_cash = $cash;
             $order->paid_in_card = $card;

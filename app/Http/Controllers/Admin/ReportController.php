@@ -47,84 +47,78 @@ class ReportController extends Controller
     private function applyPaymentCollectionFilter($query, ?string $paymentMethod)
     {
         if (!$paymentMethod) return $query;
+
         return match ($paymentMethod) {
-            'Cash' => $query->where('paid_in_cash', '>', 0),
-            'Card' => $query->where('paid_in_card', '>', 0),
-            'Mobile Banking' => $query->where('paid_in_mfc', '>', 0),
+            'Cash' => $query->where(function ($q) {
+                $q->where('paid_in_cash', '>', 0)
+                  ->orWhere(function ($nested) {
+                      $nested->where('payment_type', 'Cash')
+                             ->where('total_paid_amount', '>', 0);
+                  });
+            }),
+            'Card' => $query->where(function ($q) {
+                $q->where('paid_in_card', '>', 0)
+                  ->orWhere(function ($nested) {
+                      $nested->where('payment_type', 'Card')
+                             ->where('total_paid_amount', '>', 0);
+                  });
+            }),
+            'Mobile Banking' => $query->where(function ($q) {
+                $q->where('paid_in_mfc', '>', 0)
+                  ->orWhere(function ($nested) {
+                      $nested->where('payment_type', 'Mobile Banking')
+                             ->where('total_paid_amount', '>', 0);
+                  });
+            }),
             'Split' => $query->where('payment_type', 'Split'),
             default => $query->where('payment_type', $paymentMethod),
         };
     }
 
-    /** ১. ওভারভিউ: সেলস ও অর্ডার রিপোর্ট (গ্রাফ ছাড়া পিরিয়ডিক টেবিল) */
+    /** ১. সেলস ও অর্ডার রিপোর্ট — completed order details with custom pagination. */
     public function salesOrder(Request $request)
     {
         $filters = $this->resolveReportFilters($request);
         extract($filters);
 
-        $query = Order::where('status', 'Completed')->whereBetween('created_at', [$startDate, $endDate]);
+        // Same filtered completed order query will drive summary cards, table, AJAX and export filters.
+        $baseQuery = Order::with(['customer', 'table', 'orderDetails'])
+            ->where('status', 'Completed')
+            ->whereBetween('created_at', [$startDate, $endDate]);
 
-        // টোটাল সামারি কার্ডের জন্য ডেটা
-        $totalRevenue = (clone $query)->sum('grand_total');
-        $totalDiscount = (clone $query)->sum('discount_amount');
-        $totalOrders = (clone $query)->count();
+        // Summary cards.
+        $totalRevenue = (clone $baseQuery)->sum('grand_total');
+        $totalDiscount = (clone $baseQuery)->sum('discount_amount');
+        $totalOrders = (clone $baseQuery)->count();
         $avgOrderValue = $totalOrders > 0 ? ($totalRevenue / $totalOrders) : 0;
-        $uniqueCustomers = (clone $query)->whereNotNull('customer_id')->distinct('customer_id')->count('customer_id');
+        $uniqueCustomers = (clone $baseQuery)
+            ->whereNotNull('customer_id')
+            ->distinct('customer_id')
+            ->count('customer_id');
 
-        // পিরিয়ড কলাম এবং ডেটা প্রিপারেশন
-        $periodData = [];
-        if ($filterType === 'year') {
-            // মাস ভিত্তিক গ্রুপ (Jan 2026, Feb 2026)
-            $sales = (clone $query)
-                ->select(DB::raw('MONTH(created_at) as m'), DB::raw('YEAR(created_at) as y'), DB::raw('SUM(grand_total) as total_sales'), DB::raw('SUM(discount_amount) as total_discount'), DB::raw('COUNT(id) as total_orders'))
-                ->groupBy('y', 'm')
-                ->get();
-
-            for ($m = 1; $m <= 12; $m++) {
-                $carbonObj = Carbon::create($year, $m, 1);
-                $row = $sales->where('m', $m)->first();
-                $periodData[] = [
-                    'period' => $carbonObj->format('M Y'),
-                    'total_orders' => $row ? $row->total_orders : 0,
-                    'total_sales' => $row ? (float)$row->total_sales : 0,
-                    'total_discount' => $row ? (float)$row->total_discount : 0
-                ];
-            }
-        } else {
-            // মাস বা নির্দিষ্ট ডেট রেঞ্জের জন্য দিন ভিত্তিক গ্রুপ (01/12/2025)
-            $sales = (clone $query)
-                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(grand_total) as total_sales'), DB::raw('SUM(discount_amount) as total_discount'), DB::raw('COUNT(id) as total_orders'))
-                ->groupBy('d')
-                ->get();
-
-            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                $dateStr = $date->format('Y-m-d');
-                $row = $sales->where('d', $dateStr)->first();
-                $periodData[] = [
-                    'period' => $date->format('d/m/Y'),
-                    'total_orders' => $row ? $row->total_orders : 0,
-                    'total_sales' => $row ? (float)$row->total_sales : 0,
-                    'total_discount' => $row ? (float)$row->total_discount : 0
-                ];
-            }
-        }
+        // Detailed order rows used by resources/views/admin/reports/partials/sales_table_rows.blade.php.
+        $orders = (clone $baseQuery)
+            ->orderBy('id', 'desc')
+            ->paginate(15)
+            ->appends($request->query());
 
         if ($request->ajax()) {
             return response()->json([
-                'html' => view('admin.reports.partials.sales_table_rows', compact('periodData', 'totalRevenue', 'totalDiscount', 'totalOrders'))->render(),
+                'html' => view('admin.reports.partials.sales_table_rows', compact('orders'))->render(),
+                'pagination' => view('admin.reports.partials.custom_pagination', ['paginator' => $orders])->render(),
                 'summary' => [
                     'revenue' => '৳' . number_format($totalRevenue, 0),
                     'discount' => '৳' . number_format($totalDiscount, 0),
                     'orders' => $totalOrders,
                     'avg' => '৳' . number_format($avgOrderValue, 0),
-                    'customers' => $uniqueCustomers
-                ]
+                    'customers' => $uniqueCustomers,
+                ],
             ]);
         }
 
         return view('admin.reports.sales_order', compact(
             'filterType', 'year', 'month', 'startDate', 'endDate', 'yearOptions',
-            'totalRevenue', 'totalDiscount', 'totalOrders', 'avgOrderValue', 'uniqueCustomers', 'periodData'
+            'totalRevenue', 'totalDiscount', 'totalOrders', 'avgOrderValue', 'uniqueCustomers', 'orders'
         ));
     }
 
@@ -146,23 +140,49 @@ class ReportController extends Controller
 
         $orders = $ordersQuery->get();
 
-        // এখানে শুধু ফিল্টার করা মেথডের টাকাই ক্যালকুলেট হবে
-        $cashAmount = (!$paymentMethod || $paymentMethod == 'Cash') ? (float) $orders->sum('paid_in_cash') : 0;
-        $cardAmount = (!$paymentMethod || $paymentMethod == 'Card') ? (float) $orders->sum('paid_in_card') : 0;
-        $mfcAmount = (!$paymentMethod || $paymentMethod == 'Mobile Banking') ? (float) $orders->sum('paid_in_mfc') : 0;
+        // Legacy-safe collection breakdown. New payments use paid_in_* columns; old payments may have only total_paid_amount.
+        $cashAmount = 0;
+        $cardAmount = 0;
+        $mfcAmount = 0;
+        $cashOrders = 0;
+        $cardOrders = 0;
+        $mfcOrders = 0;
+
+        foreach ($orders as $order) {
+            $cash = (float) ($order->paid_in_cash ?? 0);
+            $card = (float) ($order->paid_in_card ?? 0);
+            $mfc = (float) ($order->paid_in_mfc ?? 0);
+
+            if (($cash + $card + $mfc) <= 0 && (float) ($order->total_paid_amount ?? 0) > 0) {
+                if ($order->payment_type === 'Cash') {
+                    $cash = (float) $order->total_paid_amount;
+                } elseif ($order->payment_type === 'Card') {
+                    $card = (float) $order->total_paid_amount;
+                } elseif ($order->payment_type === 'Mobile Banking') {
+                    $mfc = (float) $order->total_paid_amount;
+                }
+            }
+
+            $cashAmount += (!$paymentMethod || $paymentMethod === 'Cash') ? $cash : 0;
+            $cardAmount += (!$paymentMethod || $paymentMethod === 'Card') ? $card : 0;
+            $mfcAmount += (!$paymentMethod || $paymentMethod === 'Mobile Banking') ? $mfc : 0;
+
+            if ($cash > 0 && (!$paymentMethod || $paymentMethod === 'Cash')) $cashOrders++;
+            if ($card > 0 && (!$paymentMethod || $paymentMethod === 'Card')) $cardOrders++;
+            if ($mfc > 0 && (!$paymentMethod || $paymentMethod === 'Mobile Banking')) $mfcOrders++;
+        }
 
         $totalCollected = $cashAmount + $cardAmount + $mfcAmount;
 
-        // যেই মেথড দিয়ে সার্চ করা হবে, উপরের কার্ডে শুধু সেটাই দেখাবে
         $paymentRows = [];
         if (!$paymentMethod || $paymentMethod == 'Cash') {
-            $paymentRows[] = ['label' => 'Cash', 'icon' => 'bi-cash-coin', 'amount' => $cashAmount, 'orders_count' => $orders->filter(fn($o) => $o->paid_in_cash > 0)->count(), 'percentage' => $totalCollected > 0 ? ($cashAmount / $totalCollected) * 100 : 0];
+            $paymentRows[] = ['label' => 'Cash', 'icon' => 'bi-cash-coin', 'amount' => $cashAmount, 'orders_count' => $cashOrders, 'percentage' => $totalCollected > 0 ? ($cashAmount / $totalCollected) * 100 : 0];
         }
         if (!$paymentMethod || $paymentMethod == 'Card') {
-            $paymentRows[] = ['label' => 'Card', 'icon' => 'bi-credit-card', 'amount' => $cardAmount, 'orders_count' => $orders->filter(fn($o) => $o->paid_in_card > 0)->count(), 'percentage' => $totalCollected > 0 ? ($cardAmount / $totalCollected) * 100 : 0];
+            $paymentRows[] = ['label' => 'Card', 'icon' => 'bi-credit-card', 'amount' => $cardAmount, 'orders_count' => $cardOrders, 'percentage' => $totalCollected > 0 ? ($cardAmount / $totalCollected) * 100 : 0];
         }
         if (!$paymentMethod || $paymentMethod == 'Mobile Banking') {
-            $paymentRows[] = ['label' => 'Mobile Banking / MFC', 'icon' => 'bi-phone', 'amount' => $mfcAmount, 'orders_count' => $orders->filter(fn($o) => $o->paid_in_mfc > 0)->count(), 'percentage' => $totalCollected > 0 ? ($mfcAmount / $totalCollected) * 100 : 0];
+            $paymentRows[] = ['label' => 'Mobile Banking / MFC', 'icon' => 'bi-phone', 'amount' => $mfcAmount, 'orders_count' => $mfcOrders, 'percentage' => $totalCollected > 0 ? ($mfcAmount / $totalCollected) * 100 : 0];
         }
 
         $paymentOrders = Order::with(['customer', 'table'])
@@ -265,31 +285,64 @@ class ReportController extends Controller
 
     private function paymentExportRows(Carbon $startDate, Carbon $endDate, ?string $paymentMethod)
     {
-        $ordersQuery = Order::where('status', 'Completed')->whereBetween('created_at', [$startDate, $endDate]);
+        $ordersQuery = Order::with(['customer', 'table'])
+            ->where('status', 'Completed')
+            ->whereBetween('created_at', [$startDate, $endDate]);
+
         if ($paymentMethod) {
             $this->applyPaymentCollectionFilter($ordersQuery, $paymentMethod);
         }
 
-        $orders = $ordersQuery->get();
+        return $ordersQuery->orderBy('id', 'desc')->get()->map(function ($order) use ($paymentMethod) {
+            $cashAmount = (float) ($order->paid_in_cash ?? 0);
+            $cardAmount = (float) ($order->paid_in_card ?? 0);
+            $mfcAmount = (float) ($order->paid_in_mfc ?? 0);
 
-        $cashAmount = (!$paymentMethod || $paymentMethod == 'Cash') ? (float) $orders->sum('paid_in_cash') : 0;
-        $cardAmount = (!$paymentMethod || $paymentMethod == 'Card') ? (float) $orders->sum('paid_in_card') : 0;
-        $mfcAmount = (!$paymentMethod || $paymentMethod == 'Mobile Banking') ? (float) $orders->sum('paid_in_mfc') : 0;
+            // Legacy order fallback: old records may have only payment_type + total_paid_amount.
+            if (($cashAmount + $cardAmount + $mfcAmount) <= 0 && (float) ($order->total_paid_amount ?? 0) > 0) {
+                if ($order->payment_type === 'Cash') {
+                    $cashAmount = (float) $order->total_paid_amount;
+                } elseif ($order->payment_type === 'Card') {
+                    $cardAmount = (float) $order->total_paid_amount;
+                } elseif ($order->payment_type === 'Mobile Banking') {
+                    $mfcAmount = (float) $order->total_paid_amount;
+                }
+            }
 
-        $totalCollected = $cashAmount + $cardAmount + $mfcAmount;
+            if ($paymentMethod === 'Cash') {
+                $paymentText = 'Cash';
+                $rowTotal = $cashAmount;
+            } elseif ($paymentMethod === 'Card') {
+                $paymentText = 'Card';
+                $rowTotal = $cardAmount;
+            } elseif ($paymentMethod === 'Mobile Banking') {
+                $paymentText = 'Mobile Banking';
+                $rowTotal = $mfcAmount;
+            } else {
+                $paymentParts = [];
+                if ($cashAmount > 0) $paymentParts[] = 'Cash';
+                if ($cardAmount > 0) $paymentParts[] = 'Card';
+                if ($mfcAmount > 0) $paymentParts[] = 'Mobile Banking';
 
-        $rows = [];
-        if (!$paymentMethod || $paymentMethod == 'Cash') {
-            $rows[] = ['label' => 'Cash', 'amount' => $cashAmount, 'orders_count' => $orders->filter(fn($o) => $o->paid_in_cash > 0)->count(), 'percentage' => $totalCollected > 0 ? ($cashAmount / $totalCollected) * 100 : 0];
-        }
-        if (!$paymentMethod || $paymentMethod == 'Card') {
-            $rows[] = ['label' => 'Card', 'amount' => $cardAmount, 'orders_count' => $orders->filter(fn($o) => $o->paid_in_card > 0)->count(), 'percentage' => $totalCollected > 0 ? ($cardAmount / $totalCollected) * 100 : 0];
-        }
-        if (!$paymentMethod || $paymentMethod == 'Mobile Banking') {
-            $rows[] = ['label' => 'Mobile Banking / MFC', 'amount' => $mfcAmount, 'orders_count' => $orders->filter(fn($o) => $o->paid_in_mfc > 0)->count(), 'percentage' => $totalCollected > 0 ? ($mfcAmount / $totalCollected) * 100 : 0];
-        }
+                $paymentText = count($paymentParts) > 0
+                    ? implode(' + ', $paymentParts)
+                    : ($order->payment_type ?? 'N/A');
 
-        return collect($rows);
+                $rowTotal = (float) ($order->total_paid_amount ?? ($cashAmount + $cardAmount + $mfcAmount));
+            }
+
+            return [
+                'order_number' => $order->order_number,
+                'date' => optional($order->created_at)->format('d M, h:i A'),
+                'customer' => optional($order->customer)->name ?? 'Walk-in',
+                'table' => optional($order->table)->table_number ?? 'Takeaway',
+                'payment_type' => $paymentText,
+                'cash' => $cashAmount,
+                'card' => $cardAmount,
+                'mfc' => $mfcAmount,
+                'total_paid' => $rowTotal,
+            ];
+        });
     }
 
     private function foodExportRows(Carbon $startDate, Carbon $endDate)
@@ -315,7 +368,7 @@ class ReportController extends Controller
         return $name . '-' . now()->format('Y-m-d-His') . '.' . $extension;
     }
 
-    private function exportViewData(Request $request): array
+   private function exportViewData(Request $request): array
     {
         $filters = $this->resolveReportFilters($request);
         extract($filters);
@@ -334,10 +387,16 @@ class ReportController extends Controller
         } elseif ($report === 'food_sales') {
             $dataRows = $this->foodExportRows($startDate, $endDate);
         } else {
-            $dataRows = $this->salesOrderExportRows($filterType, $year, $startDate, $endDate);
-            $periodTotalSale = $dataRows->sum('total_sale');
-            $periodTotalDiscount = $dataRows->sum('total_discount');
-            $periodTotalOrder = $dataRows->sum('total_order');
+            // Updated for exact blade table matching
+            $dataRows = Order::with(['customer', 'table', 'orderDetails'])
+                ->where('status', 'Completed')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->orderBy('id', 'desc')
+                ->get();
+
+            $periodTotalSale = $dataRows->sum('grand_total');
+            $periodTotalDiscount = $dataRows->sum('discount_amount');
+            $periodTotalOrder = $dataRows->count();
         }
 
         return compact('report', 'dataRows', 'startDate', 'endDate', 'periodTotalSale', 'periodTotalDiscount', 'periodTotalOrder') + [
@@ -359,7 +418,7 @@ class ReportController extends Controller
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
             'format' => 'A4',
-            'orientation' => 'P',
+            'orientation' => in_array($viewData['report'], ['payment_type_sales', 'sales_order'], true) ? 'L' : 'P',
             'margin_left' => 8,
             'margin_right' => 8,
             'margin_top' => 10,

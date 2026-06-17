@@ -28,7 +28,7 @@
     <div class="header">
         <h2>{{ optional($restaurant)->name ?? 'Progga RMS' }}</h2>
         <p>{{ optional($restaurant)->address ?? 'Dhaka, Bangladesh' }} | Phone: {{ optional($restaurant)->phone ?? 'N/A' }}</p>
-        <h3>Order Report — {{ now()->format('d M, Y') }}</h3>
+        <h3>Order Report — {{ $dateFilterLabel ?? now()->format('d M, Y') }}</h3>
     </div>
 
     <table>
@@ -90,7 +90,7 @@
                         $splits = [];
                         if((float)$order->paid_in_cash > 0) $splits[] = 'Cash: ' . $order->paid_in_cash;
                         if((float)$order->paid_in_card > 0) $splits[] = 'Card: ' . $order->paid_in_card;
-                        if((float)$order->paid_in_mfc > 0) $splits[] = 'MFC: ' . $order->paid_in_mfc;
+                        if((float)$order->paid_in_mfc > 0) $splits[] = 'MFS: ' . $order->paid_in_mfc;
                         $paymentText .= '<br><span class="muted">(' . implode(', ', $splits) . ')</span>';
                     }
                 @endphp
