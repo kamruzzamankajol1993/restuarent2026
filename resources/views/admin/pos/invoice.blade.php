@@ -1,3 +1,10 @@
+@php
+    // Invoice can be opened directly after payment without POS index variables.
+    // Keep optional POS session variables safe if any shared block checks them.
+    $activeSession = $activeSession ?? null;
+    $requirePreviousSessionClose = $requirePreviousSessionClose ?? false;
+    $sessions = $sessions ?? collect();
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -154,10 +161,22 @@
       gap: 12px; margin-bottom: 6px;
     }
     .bill-payment-metric { text-align: right; }
-    .bill-payment-change {
-      display: flex; justify-content: flex-end;
+    .bill-payment-adjustments {
       margin-top: 8px; padding-top: 8px;
       border-top: 1.5px dashed #000;
+    }
+    .bill-payment-info-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 3px 0; font-family: var(--mono); font-size: 12px;
+      color: #000; font-weight: 900;
+    }
+    .bill-payment-info-row span:first-child {
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+    .bill-payment-change {
+      display: flex; justify-content: flex-end;
+      margin-top: 6px; padding-top: 6px;
+      border-top: 1px dashed #000;
     }
     .bill-payment-change .bill-payment-metric { min-width: 110px; }
 
@@ -328,7 +347,7 @@
         @endif
  @if($order->discount_amount > 0)
         <div class="bill-total-row discount">
-          <span>Discount ({{ ucfirst($order->discount_type) }})</span>
+          <span>Discount (honored)</span>
           <span>− {{ number_format($order->discount_amount, 0) }}</span>
         </div>
         @endif
@@ -337,6 +356,13 @@
           <span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->grand_total, 0) }}</span>
         </div>
       </div>
+
+      @php
+          // Invoice payment display helper values.
+          // Given Amount and Tips will show above Change when available.
+          $invoiceGivenAmount = max(0, (float) ($order->given_money ?? 0));
+          $invoiceTipsAmount = max(0, (float) ($order->tips_amount ?? 0));
+      @endphp
 
       @if(($order->payment_type ?? 'Cash') === 'Split')
         <div class="bill-payment" style="display:block;">
@@ -352,7 +378,18 @@
           </div>
           <div class="bill-total-row"><span>Cash</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_cash ?? $order->paid_in_cash ?? 0, 0) }}</span></div>
           <div class="bill-total-row"><span>Card</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_card ?? $order->paid_in_card ?? 0, 0) }}</span></div>
-          <div class="bill-total-row"><span>MFS/ Mobile</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_mfc ?? $order->paid_in_mfc ?? 0, 0) }}</span></div>
+          <div class="bill-total-row"><span>MFC / Mobile</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->invoice_paid_in_mfc ?? $order->paid_in_mfc ?? 0, 0) }}</span></div>
+
+          @if($invoiceGivenAmount > 0 || $invoiceTipsAmount > 0)
+            <div class="bill-payment-adjustments">
+              @if($invoiceGivenAmount > 0)
+                <div class="bill-payment-info-row"><span>Given Amount</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($invoiceGivenAmount, 0) }}</span></div>
+              @endif
+
+                <div class="bill-payment-info-row"><span>Tips</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($invoiceTipsAmount, 0) }}</span></div>
+
+            </div>
+          @endif
 
 
             <div class="bill-payment-change">
@@ -379,6 +416,17 @@
               <div class="bill-payment-val">{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($order->total_paid_amount ?? 0, 0) }}</div>
             </div>
           </div>
+
+          @if($invoiceGivenAmount > 0 || $invoiceTipsAmount > 0)
+            <div class="bill-payment-adjustments">
+              @if($invoiceGivenAmount > 0)
+                <div class="bill-payment-info-row"><span>Given Amount</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($invoiceGivenAmount, 0) }}</span></div>
+              @endif
+
+                <div class="bill-payment-info-row"><span>Tips</span><span>{{ $restaurantSettingCurrency ?? '৳' }} {{ number_format($invoiceTipsAmount, 0) }}</span></div>
+
+            </div>
+          @endif
 
 
             <div class="bill-payment-change">
