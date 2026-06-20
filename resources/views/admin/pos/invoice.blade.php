@@ -347,7 +347,7 @@
         @endif
  @if($order->discount_amount > 0)
         <div class="bill-total-row discount">
-          <span>Discount (honored)</span>
+          <span>Honored</span>
           <span>− {{ number_format($order->discount_amount, 0) }}</span>
         </div>
         @endif
