@@ -1,10 +1,34 @@
+@php
+    $normalizedOrderType = strtolower(str_replace([' ', '-'], '_', $order->order_type ?? 'Dine-In'));
+    if(in_array($normalizedOrderType, ['dine_in', 'dinein'])) {
+        $jsOrderType = 'dine_in';
+        $orderHeaderLabel = 'Occupied Table';
+        $orderDisplayName = $order->table->table_number ?? 'Table';
+        $orderDisplayMeta = ($order->table->zone->name ?? 'Main') . ' · ' . ($order->table->seating_capacity ?? 0) . ' seats';
+        $payDisplayLabel = $order->table->table_number ?? 'Table';
+    } elseif($normalizedOrderType === 'delivery') {
+        $jsOrderType = 'delivery';
+        $orderHeaderLabel = 'Active Delivery Order';
+        $orderDisplayName = 'Delivery #' . $order->order_number;
+        $orderDisplayMeta = ($order->customer->name ?? 'Walk-in Customer') . ' · Delivery';
+        $payDisplayLabel = 'Delivery #' . $order->order_number;
+    } else {
+        $jsOrderType = 'takeaway';
+        $orderHeaderLabel = 'Active Takeaway Order';
+        $orderDisplayName = 'Takeaway #' . $order->order_number;
+        $orderDisplayMeta = ($order->customer->name ?? 'Walk-in Customer') . ' · Takeaway';
+        $payDisplayLabel = 'Takeaway #' . $order->order_number;
+    }
+@endphp
+
 <div class="progga-oc-header">
     <div>
-        <div class="progga-oc-table-label">Occupied Table</div>
-        <div class="progga-oc-table-num" id="ocTableNum">{{ $order->table->table_number ?? 'Takeaway' }}</div>
-        <div class="progga-oc-table-meta" id="ocTableMeta">{{ $order->table->zone->name ?? 'Main' }} · {{ $order->table->seating_capacity ?? 0 }} seats</div>
+        <div class="progga-oc-table-label">{{ $orderHeaderLabel }}</div>
+        <div class="progga-oc-table-num" id="ocTableNum">{{ $orderDisplayName }}</div>
+        <div class="progga-oc-table-meta" id="ocTableMeta">{{ $orderDisplayMeta }}</div>
         <div class="progga-oc-chips" id="ocChips">
             <span class="progga-oc-chip"><i class="bi bi-receipt"></i> #{{ $order->order_number }}</span>
+            <span class="progga-oc-chip"><i class="bi bi-bag-check"></i> {{ $order->order_type }}</span>
             <span class="progga-oc-chip"><i class="bi bi-person"></i> <span id="ocWaiterName">{{ $order->waiter->name ?? 'Unassigned' }}</span></span>
             <span class="progga-oc-chip"><i class="bi bi-person-check"></i> <span id="ocCustomerName">{{ $order->customer->name ?? 'Walk-in' }}</span></span>
         </div>
@@ -119,6 +143,8 @@
             <button class="progga-btn progga-btn-outline" id="btnContinueOrdering" style="flex: 1;"
                     data-order-id="{{ $order->id }}"
                     data-table-id="{{ $order->table_id }}"
+                    data-order-type="{{ $jsOrderType }}"
+                    data-order-label="{{ $orderDisplayName }}"
                     data-waiter-id="{{ $order->waiter_id }}"
                     data-waiter-name="{{ $order->waiter->name ?? '' }}"
                     data-customer-id="{{ $order->customer_id }}"
@@ -129,6 +155,8 @@
             <button class="progga-btn progga-btn-secondary" id="btnAddComplimentary" style="flex: 1;"
                     data-order-id="{{ $order->id }}"
                     data-table-id="{{ $order->table_id }}"
+                    data-order-type="{{ $jsOrderType }}"
+                    data-order-label="{{ $orderDisplayName }}"
                     data-waiter-id="{{ $order->waiter_id }}"
                     data-waiter-name="{{ $order->waiter->name ?? '' }}"
                     data-customer-id="{{ $order->customer_id }}"
@@ -165,10 +193,11 @@
                     <button class="progga-btn progga-btn-primary" id="ocPayBtn" style="flex: 1;"
                     onclick='openPaymentModal({
                         order_id: "{{ $order->id }}",
-                        order_type: "dine_in",
-                        table_no: "{{ $order->table->table_number ?? "Takeaway" }}",
+                        order_type: "{{ $jsOrderType }}",
+                        table_no: "{{ $payDisplayLabel }}",
                         subtotal: {{ $order->subtotal ?? 0 }},
-                        items: @json($payItems)
+                        items: @json($payItems),
+                        is_complimentary_order: {{ !empty($order->is_complimentary_order) ? 1 : 0 }}
                     })'>
                         <i class="bi bi-credit-card"></i> Payment
                     </button>

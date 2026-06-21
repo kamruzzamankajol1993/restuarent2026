@@ -80,7 +80,7 @@
         @else
             {{ strtoupper(substr($restaurantSettingName ?? 'P', 0, 1)) }}
         @endif
-        <span>GOLPO KHANA</span>
+        <span>{{ $restaurantSettingName ?? 'Progga RMS' }}</span>
       </div>
 
       <div class="progga-pos-step-indicator">
@@ -259,6 +259,7 @@
         waiter_id: null, waiter_name: '', customer_id: null, customer_name: '',
         customer_phone: '', is_walk_in: 1, order_notes: '', is_complimentary_order: 0
     };
+    window.currentOrder = currentOrder;
     let currentCat = '';
     let isComplimentaryMode = false;
     let isWaiter = @json(auth()->user()->hasRole('waiter'));
@@ -300,6 +301,7 @@
 
     function getCartParams() {
         return {
+            order_id: currentOrder.order_id || null,
             order_type: currentOrder.order_type,
             table_id: currentOrder.table_id
         };
@@ -449,6 +451,94 @@
 
    $('#modeTakeaway').click(function() {
         openAllTypeOrderModal();
+    });
+
+    $('#modeTakeawayDeliveryList').click(function() {
+        $('#posTableGrid').hide();
+        $('#posTableSection').hide();
+        $('#posTakeawayDeliveryPanel').fadeIn('fast');
+    });
+
+    $('#btnCompletePendingTakeawayDelivery').click(function() {
+        const $btn = $(this);
+        const originalHtml = $btn.html();
+        const pendingCards = $('.progga-pos-running-order-card').filter(function() {
+            return String($(this).attr('data-order-status') || '').toLowerCase() === 'pending';
+        });
+
+        if(pendingCards.length < 1) {
+            Swal.fire('No Pending Order', 'No pending Takeaway / Delivery order found.', 'info');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Complete pending payments?',
+            text: pendingCards.length + ' pending Takeaway / Delivery order(s) will be marked as paid and completed.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, complete',
+            cancelButtonText: 'Cancel'
+        }).then(function(result) {
+            if(!result.isConfirmed) return;
+
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Processing...');
+
+            $.post("{{ route('pos.takeaway_delivery.complete_pending') }}", {}, function(res) {
+                if(res.status === 'success') {
+                    const completedIds = (res.completed_ids || []).map(function(id) { return String(id); });
+
+                    completedIds.forEach(function(id) {
+                        const $card = $('.progga-pos-running-order-card[data-order-id="' + id + '"]');
+                        $card.attr('data-order-status', 'completed').addClass('completed');
+                        $card.find('.js-td-order-status-badge')
+                             .removeClass('progga-status-occupied')
+                             .addClass('progga-status-available')
+                             .text('Completed');
+                    });
+
+                    const remainingPending = $('.progga-pos-running-order-card').filter(function() {
+                        return String($(this).attr('data-order-status') || '').toLowerCase() === 'pending';
+                    }).length;
+
+                    $btn.html('<i class="bi bi-check2-circle"></i> Complete Pending Payment (' + remainingPending + ')');
+                    Swal.fire('Done', res.message || 'Pending payments completed successfully.', 'success');
+                } else {
+                    $btn.html(originalHtml);
+                    Swal.fire('Error', res.message || 'Payment completion failed.', 'error');
+                }
+            }).fail(function(xhr) {
+                $btn.html(originalHtml);
+                Swal.fire('Error', xhr.responseJSON?.message || 'Payment completion failed.', 'error');
+            }).always(function() {
+                $btn.prop('disabled', false);
+            });
+        });
+    });
+
+    $('#btnBackToTablesFromTdOrders').click(function() {
+        $('#posTakeawayDeliveryPanel').hide();
+        $('#posTableSection').show();
+        $('#posTableGrid').fadeIn('fast');
+    });
+
+    $(document).on('click', '.progga-pos-running-order-card', function() {
+        if(String($(this).attr('data-order-status') || '').toLowerCase() === 'completed') {
+            Swal.fire('Completed', 'This Takeaway / Delivery order is already completed.', 'success');
+            return;
+        }
+
+        const orderId = $(this).data('order-id');
+
+        $.get("{{ route('pos.get_pos_order', ':id') }}".replace(':id', orderId), function(res) {
+            if(res.status === 'load_cart') {
+                window.loadHeldQrOrderToPos(res.order_data);
+            } else if(res.status === 'error') {
+                Swal.fire('Notice', res.message, 'info');
+            } else {
+                $('#ocBody').html(res);
+                bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('tableOrderOffcanvas')).show();
+            }
+        });
     });
 
    $('input[name="orderType"]').on('change', function() {
@@ -642,9 +732,9 @@
 
     window.loadHeldQrOrderToPos = function(data) {
         currentOrder.order_id = data.order_id || null;
-        currentOrder.order_type = 'dine_in';
+        currentOrder.order_type = data.order_type || 'dine_in';
         currentOrder.table_id = data.table_id || null;
-        currentOrder.table_name = data.table_number || ('Table ' + (data.table_id || ''));
+        currentOrder.table_name = data.table_number || (currentOrder.order_type === 'delivery' ? 'Delivery' : (currentOrder.order_type === 'takeaway' ? 'Takeaway' : ('Table ' + (data.table_id || ''))));
         currentOrder.waiter_id = data.waiter_id || null;
         currentOrder.waiter_name = data.waiter_name || 'Unassigned';
         currentOrder.customer_id = data.customer_id || null;
@@ -655,14 +745,16 @@
         currentOrder.is_complimentary_order = 0;
         isComplimentaryMode = false;
 
-        let tableCard = $('.progga-pos-table-card[data-table-id="' + currentOrder.table_id + '"]');
-        if(tableCard.length) {
-            tableCard.removeClass('available reserved').addClass('occupied');
-            tableCard.attr('data-status', 'occupied');
-            tableCard.find('.progga-badge')
-                .removeClass('progga-status-available progga-status-reserved')
-                .addClass('progga-status-occupied')
-                .text('Occupied');
+        if(currentOrder.order_type === 'dine_in' && currentOrder.table_id) {
+            let tableCard = $('.progga-pos-table-card[data-table-id="' + currentOrder.table_id + '"]');
+            if(tableCard.length) {
+                tableCard.removeClass('available reserved').addClass('occupied');
+                tableCard.attr('data-status', 'occupied');
+                tableCard.find('.progga-badge')
+                    .removeClass('progga-status-available progga-status-reserved')
+                    .addClass('progga-status-occupied')
+                    .text('Occupied');
+            }
         }
 
         showStep(2);
@@ -844,6 +936,11 @@
                 });
             }
         });
+    });
+
+    $(document).on('click', '#btnHoldOrder', function(e) {
+        e.preventDefault();
+        $('#btnSendToKitchen').trigger('click');
     });
 
     function posPaymentNumber(value) {
@@ -1084,8 +1181,17 @@
                     Swal.fire({ icon: 'success', title: 'Deleted!', text: res.message, timer: 1200, showConfirmButton: false });
 
                     let tableId = currentOrder.table_id || $('#btnContinueOrdering').data('table-id');
+                    let orderId = currentOrder.order_id || $('#btnContinueOrdering').data('order-id');
                     if(tableId) {
                         $.get("{{ route('pos.get_table_order', ':id') }}".replace(':id', tableId), function(html) {
+                            if(typeof html === 'object' && html.status === 'error') {
+                                location.reload();
+                            } else {
+                                $('#ocBody').html(html);
+                            }
+                        });
+                    } else if(orderId) {
+                        $.get("{{ route('pos.get_pos_order', ':id') }}".replace(':id', orderId), function(html) {
                             if(typeof html === 'object' && html.status === 'error') {
                                 location.reload();
                             } else {
@@ -1114,12 +1220,13 @@
         const waiterName = $(this).data('waiter-name');
         const customerId = $(this).data('customer-id');
         const customerName = $(this).data('customer-name');
-        const tNum = $('#ocTableNum').text();
+        const orderType = $(this).data('order-type') || 'dine_in';
+        const orderLabel = $(this).data('order-label') || $('#ocTableNum').text();
 
-        currentOrder.table_id = tId;
-        currentOrder.table_name = tNum;
+        currentOrder.table_id = tId || null;
+        currentOrder.table_name = orderLabel;
         currentOrder.order_id = orderId;
-        currentOrder.order_type = 'dine_in';
+        currentOrder.order_type = orderType;
         currentOrder.waiter_id = waiterId ? waiterId : null;
         currentOrder.waiter_name = waiterName ? waiterName : '';
 
@@ -1163,12 +1270,13 @@
         const customerId = $(this).data('customer-id');
         const customerName = $(this).data('customer-name');
 
-        const tNum = $('#ocTableNum').text();
+        const orderType = $(this).data('order-type') || 'dine_in';
+        const orderLabel = $(this).data('order-label') || $('#ocTableNum').text();
 
-        currentOrder.table_id = tId;
-        currentOrder.table_name = tNum;
+        currentOrder.table_id = tId || null;
+        currentOrder.table_name = orderLabel;
         currentOrder.order_id = orderId;
-        currentOrder.order_type = 'dine_in';
+        currentOrder.order_type = orderType;
         currentOrder.is_complimentary_order = 0;
         isComplimentaryMode = false;
 

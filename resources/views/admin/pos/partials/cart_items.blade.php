@@ -74,13 +74,6 @@
         <input type="number" class="form-control form-control-sm text-center" id="cart_prep_time" placeholder="20" value="20" min="1" style="width: 70px; font-weight: bold; border: 1.5px solid var(--progga-border);">
     </div>
 
-    <div id="takeawayActions" style="display: none;">
-        <div class="d-flex gap-2">
-            <button class="progga-btn progga-btn-outline w-50" id="btnHoldOrder"><i class="bi bi-pause-circle"></i> Hold</button>
-            <button class="progga-btn progga-btn-primary w-50" id="btnDirectPay"><i class="bi bi-credit-card"></i> Pay Now</button>
-        </div>
-    </div>
-
     <button class="progga-btn progga-btn-primary w-100" id="btnSendToKitchen" style="padding:14px; font-weight:800;">
         <i class="bi bi-fire"></i> Send to Kitchen
     </button>
@@ -104,14 +97,8 @@
 </style>
 
 <script>
-    // Toggle Takeaway/Delivery Buttons
-    if(currentOrder.order_type === 'takeaway' || currentOrder.order_type === 'delivery') {
-        $('#takeawayActions').css('display', 'grid');
-        $('#btnSendToKitchen').hide();
-    } else {
-        $('#takeawayActions').hide();
-        $('#btnSendToKitchen').show();
-    }
+    // Dine-In, Takeaway এবং Delivery — সব POS cart একইভাবে আগে Kitchen-এ যাবে।
+    $('#btnSendToKitchen').show();
 
     // Grand Total & Mobile FAB Logic
    function calculateGrandTotal() {
@@ -161,34 +148,4 @@
         calculateGrandTotal();
     });
 
-    // Direct Pay Button Logic (For Takeaway & Delivery)
-    $('#btnDirectPay').on('click', function() {
-        let itemsArr = [
-            @forelse($cart as $cartId => $item)
-            {
-                name: "{!! addslashes($item['name']) !!}",
-                qty: {{ $item['qty'] }},
-                total: {{ ($item['price'] + $item['addon_total']) * $item['qty'] }}
-            }{{ $loop->last ? '' : ',' }}
-            @empty
-            @endforelse
-        ];
-
-        if(itemsArr.length === 0) {
-            Swal.fire('Empty Cart', 'Please add some items to the cart first.', 'warning');
-            return;
-        }
-
-       let subtotal = parseFloat("{{ $subtotal ?? 0 }}");
-        let defaultLabel = currentOrder.order_type === 'delivery' ? 'Delivery' : 'Takeaway';
-
-        window.openPaymentModal({
-            order_id: "",
-            order_type: currentOrder.order_type,
-            table_no: defaultLabel,
-            subtotal: subtotal,
-            items: itemsArr,
-            is_complimentary_order: currentOrder.is_complimentary_order || 0
-        });
-    });
 </script>
