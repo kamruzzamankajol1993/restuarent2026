@@ -129,6 +129,7 @@ Route::get('reviews', [App\Http\Controllers\Admin\ReviewController::class, 'inde
     Route::post('/pos-place-order', [App\Http\Controllers\Admin\PosController::class, 'placeOrder'])->name('pos.place_order'); // Send to Kitchen
     Route::post('/pos/hold-web-order', [App\Http\Controllers\Admin\PosController::class, 'holdWebOrder'])->name('pos.hold_web_order'); // Hold website QR order in POS cart
     Route::get('/pos/table-order/{table_id}', [App\Http\Controllers\Admin\PosController::class, 'getTableOrder'])->name('pos.get_table_order'); // Occupied Table Data
+    Route::post('/pos/table-swap', [App\Http\Controllers\Admin\PosController::class, 'swapTable'])->name('pos.table_swap'); // Dine-In active order table swap
     Route::get('/pos/active-order/{order_id}', [App\Http\Controllers\Admin\PosController::class, 'getPosOrder'])->name('pos.get_pos_order'); // Takeaway/Delivery active order data
     Route::post('/pos/takeaway-delivery/complete-pending', [App\Http\Controllers\Admin\PosController::class, 'completePendingTakeawayDeliveryPayments'])->name('pos.takeaway_delivery.complete_pending');
     Route::post('/pos/payment', [App\Http\Controllers\Admin\PosController::class, 'completePayment'])->name('pos.complete_payment');

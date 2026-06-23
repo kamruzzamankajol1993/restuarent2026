@@ -787,7 +787,164 @@ public function placeOrder(Request $request)
             ? $order->kots()->whereIn('kitchen_status', ['Pending', 'Cooking', 'Hold'])->exists()
             : false;
 
-        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy', 'finalPaymentDependsOnKitchenStatus'))->render();
+        $activeStatuses = ['Pending', 'Waiter_Hold', 'Cooking', 'Ready'];
+        $availableSwapTables = Table::with('zone')
+            ->where('id', '!=', $order->table_id)
+            ->whereRaw('LOWER(TRIM(initial_status)) = ?', ['available'])
+            ->whereNotIn('id', Order::select('table_id')
+                ->whereNotNull('table_id')
+                ->whereIn('status', $activeStatuses)
+                ->where('id', '!=', $order->id)
+            )
+            ->orderBy('table_number', 'asc')
+            ->get();
+
+        return view('admin.pos.partials.offcanvas_order', compact('order', 'kitchenBusy', 'finalPaymentDependsOnKitchenStatus', 'availableSwapTables'))->render();
+    }
+
+    public function swapTable(Request $request)
+    {
+        $request->validate([
+            'order_id' => 'required|integer|exists:orders,id',
+            'new_table_id' => 'required|integer|exists:tables,id',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $activeStatuses = ['Pending', 'Waiter_Hold', 'Cooking', 'Ready'];
+
+            $order = Order::where('id', $request->order_id)
+                ->whereIn('status', $activeStatuses)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$order) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Active order not found or already completed.'
+                ], 404);
+            }
+
+            $orderType = $this->normalizePosOrderType($order->order_type ?? 'dine_in');
+            if ($orderType !== 'dine_in') {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Table swap is allowed only for Dine-In orders.'
+                ], 422);
+            }
+
+            $oldTableId = $order->table_id;
+            $newTableId = (int) $request->new_table_id;
+
+            if (!$oldTableId) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This order has no assigned table.'
+                ], 422);
+            }
+
+            if ((int) $oldTableId === $newTableId) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Please select a different table.'
+                ], 422);
+            }
+
+            $oldTable = Table::where('id', $oldTableId)->lockForUpdate()->first();
+            $newTable = Table::where('id', $newTableId)->lockForUpdate()->first();
+
+            if (!$newTable) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Selected table was not found.'
+                ], 404);
+            }
+
+            $newTableStatus = strtolower(trim((string) $newTable->initial_status));
+            if ($newTableStatus !== 'available') {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Selected table is not available for swap.'
+                ], 422);
+            }
+
+            $targetHasActiveOrder = Order::where('table_id', $newTableId)
+                ->where('id', '!=', $order->id)
+                ->whereIn('status', $activeStatuses)
+                ->exists();
+
+            if ($targetHasActiveOrder) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Selected table already has an active order.'
+                ], 422);
+            }
+
+            $order->table_id = $newTableId;
+            $order->save();
+
+            if (Schema::hasColumn('order_kots', 'table_id')) {
+                OrderKot::where('order_id', $order->id)->update(['table_id' => $newTableId]);
+            }
+
+            $newTable->initial_status = 'Occupied';
+            $newTable->save();
+            $newTable->loadMissing('zone');
+
+            if ($oldTable) {
+                $oldTableStillHasActiveOrder = Order::where('table_id', $oldTable->id)
+                    ->where('id', '!=', $order->id)
+                    ->whereIn('status', $activeStatuses)
+                    ->exists();
+
+                if (!$oldTableStillHasActiveOrder) {
+                    $oldTable->initial_status = 'Available';
+                    $oldTable->save();
+                }
+            }
+
+            $oldCartKey = 'pos_cart_table_' . $oldTableId;
+            $newCartKey = 'pos_cart_table_' . $newTableId;
+
+            if ($oldCartKey !== $newCartKey && Session::has($oldCartKey)) {
+                $oldCart = Session::get($oldCartKey, []);
+                $newCart = Session::get($newCartKey, []);
+
+                if (!is_array($oldCart)) $oldCart = [];
+                if (!is_array($newCart)) $newCart = [];
+
+                Session::put($newCartKey, array_replace($newCart, $oldCart));
+                Session::forget($oldCartKey);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Table swapped successfully.',
+                'order_id' => $order->id,
+                'old_table_id' => (int) $oldTableId,
+                'old_table_number' => $oldTable->table_number ?? null,
+                'new_table_id' => $newTable->id,
+                'new_table_number' => $newTable->table_number,
+                'new_table_meta' => ($newTable->zone->name ?? 'Main') . ' · ' . ($newTable->seating_capacity ?? 0) . ' seats',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Table swap failed! ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function getPosOrder($order_id)

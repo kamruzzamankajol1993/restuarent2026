@@ -134,6 +134,42 @@
         </div>
     </div>
 
+    @if($jsOrderType === 'dine_in')
+        <div class="progga-table-swap-box">
+            <button type="button" class="progga-table-swap-toggle" id="btnToggleTableSwap">
+                <span><i class="bi bi-arrow-left-right"></i> Table Swap</span>
+                <small>Current: <strong id="tableSwapCurrentLabel">{{ $orderDisplayName }}</strong></small>
+            </button>
+
+            <form id="tableSwapForm" class="progga-table-swap-panel" style="display:none;">
+                <input type="hidden" name="order_id" value="{{ $order->id }}">
+                <input type="hidden" name="current_table_id" value="{{ $order->table_id }}">
+
+                <label class="progga-table-swap-label" for="tableSwapNewTable">Move this order to</label>
+                <div class="d-flex gap-2">
+                    <select id="tableSwapNewTable" name="new_table_id" class="form-select form-select-sm" {{ ($availableSwapTables ?? collect())->count() < 1 ? 'disabled' : '' }} required>
+                        @if(($availableSwapTables ?? collect())->count() > 0)
+                            <option value="">— Select Available Table —</option>
+                            @foreach($availableSwapTables as $swapTable)
+                                <option value="{{ $swapTable->id }}"
+                                        data-table-number="{{ $swapTable->table_number }}"
+                                        data-table-meta="{{ ($swapTable->zone->name ?? 'Main') . ' · ' . ($swapTable->seating_capacity ?? 0) . ' seats' }}">
+                                    {{ $swapTable->table_number }} — {{ $swapTable->zone->name ?? 'Main' }}
+                                </option>
+                            @endforeach
+                        @else
+                            <option value="">No available table found</option>
+                        @endif
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold" id="btnConfirmTableSwap" {{ ($availableSwapTables ?? collect())->count() < 1 ? 'disabled' : '' }}>
+                        Swap
+                    </button>
+                </div>
+                <div class="progga-table-swap-help">Old table will become Available and selected table will become Occupied.</div>
+            </form>
+        </div>
+    @endif
+
     <div class="progga-oc-actions">
         @if($order->status == 'Waiter_Hold')
             <button class="progga-btn progga-btn-secondary" disabled style="flex: 1; opacity: 0.8; cursor: not-allowed; font-weight:bold; font-size: 13px; padding: 10px 5px; white-space: normal; line-height: 1.2;">
@@ -215,6 +251,59 @@
         border-radius: 6px;
         margin-left: 6px;
         flex: 0 0 auto;
+    }
+
+    .progga-table-swap-box {
+        margin-bottom: 12px;
+        padding: 10px;
+        border: 1px solid rgba(33, 53, 42, .14);
+        border-radius: 12px;
+        background: rgba(248, 249, 250, .9);
+    }
+
+    .progga-table-swap-toggle {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--progga-primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 0;
+        font-weight: 900;
+        font-size: 13px;
+        text-align: left;
+    }
+
+    .progga-table-swap-toggle small {
+        color: #777;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .progga-table-swap-panel {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed rgba(33, 53, 42, .18);
+    }
+
+    .progga-table-swap-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 800;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+
+    .progga-table-swap-help {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #777;
+        line-height: 1.35;
     }
 </style>
 

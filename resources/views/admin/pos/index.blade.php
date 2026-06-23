@@ -307,6 +307,45 @@
         };
     }
 
+    function setPosTableStatus(tableId, status) {
+        if (!tableId) return;
+
+        const normalized = String(status || 'available').toLowerCase();
+        const label = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+        const $card = $('.progga-pos-table-card[data-table-id="' + tableId + '"]');
+
+        if ($card.length) {
+            $card.removeClass('available occupied reserved')
+                .addClass(normalized)
+                .attr('data-status', normalized)
+                .data('status', normalized);
+
+            $card.find('.progga-badge')
+                .removeClass('progga-status-available progga-status-occupied progga-status-reserved')
+                .addClass('progga-status-' + normalized)
+                .text(label);
+        }
+
+        const $option = $('#modalTableSelect option[value="' + tableId + '"]');
+        if ($option.length) {
+            let baseText = $option.data('table-name') || $option.text();
+            baseText = String(baseText).replace(/\s+—\s+(Occupied|Reserved|Available)$/i, '');
+            $option.attr('data-status', normalized).data('status', normalized);
+
+            if (normalized === 'available') {
+                $option.prop('disabled', false).text(baseText);
+            } else {
+                $option.prop('disabled', true).text(baseText + ' — ' + label);
+            }
+        }
+
+        const activeFilter = $('.progga-pos-filter-btn.active').data('table-filter');
+        if (activeFilter && activeFilter !== 'all') {
+            $('.progga-pos-table-card').hide();
+            $('.progga-pos-table-card[data-status="' + activeFilter + '"]').show();
+        }
+    }
+
 
     let newOrderModalMode = 'all';
     // POS workflow note.
@@ -428,25 +467,56 @@
 
     $('#posBackToTables').click(function() { showStep(1); });
 
-    $(document).on('click', '.progga-pos-table-card', function() {
-        const tId = $(this).data('table-id');
-        const tNum = $(this).data('table-num');
+    $(document).on('click', '.progga-pos-table-card', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
 
-        if($(this).hasClass('occupied')) {
-            $.get("{{ route('pos.get_table_order', ':id') }}".replace(':id', tId), function(res) {
-                // POS workflow note.
-                if(res.status === 'load_cart') {
-                    window.loadHeldQrOrderToPos(res.order_data);
-                } else if(res.status === 'error') {
-                    Swal.fire('Notice', res.message, 'info');
-                } else {
-                    $('#ocBody').html(res);
-                    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('tableOrderOffcanvas')).show();
-                }
-            });
-        } else {
-            openDineInTableModal(tId, tNum);
+        const $card = $(this);
+        const tId = $card.attr('data-table-id');
+        const tNum = $card.attr('data-table-num');
+
+        if(!tId || $card.data('opening-order') === true) {
+            return;
         }
+
+        $card.data('opening-order', true);
+
+        // Always verify from server first.
+        // After table swap, frontend card status can be stale for a moment;
+        // server check prevents New Order modal and active order offcanvas from opening together.
+        $.get("{{ route('pos.get_table_order', ':id') }}".replace(':id', tId), function(res) {
+            $card.data('opening-order', false);
+
+            if(typeof res === 'object' && res !== null) {
+                if(res.status === 'load_cart') {
+                    bootstrap.Modal.getInstance(document.getElementById('newOrderModal'))?.hide();
+                    window.loadHeldQrOrderToPos(res.order_data);
+                    return;
+                }
+
+                if(res.status === 'error') {
+                    setPosTableStatus(tId, 'available');
+                    openDineInTableModal(tId, tNum);
+                    return;
+                }
+            }
+
+            // HTML response means active order exists, so only offcanvas should open.
+            bootstrap.Modal.getInstance(document.getElementById('newOrderModal'))?.hide();
+            setPosTableStatus(tId, 'occupied');
+            $('#ocBody').html(res);
+            bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('tableOrderOffcanvas')).show();
+        }).fail(function() {
+            $card.data('opening-order', false);
+
+            const uiStatus = String($card.attr('data-status') || '').toLowerCase();
+            if(uiStatus === 'occupied' || $card.hasClass('occupied')) {
+                Swal.fire('Error', 'Could not load active table order. Please try again.', 'error');
+                return;
+            }
+
+            openDineInTableModal(tId, tNum);
+        });
     });
 
    $('#modeTakeaway').click(function() {
@@ -1210,6 +1280,82 @@
                 let msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Server error. Please try again.';
                 Swal.fire('Error', msg, 'error');
             }
+        });
+    });
+
+    $(document).on('click', '#btnToggleTableSwap', function() {
+        $('#tableSwapForm').slideToggle(140);
+    });
+
+    $(document).on('submit', '#tableSwapForm', function(e) {
+        e.preventDefault();
+
+        const $form = $(this);
+        const orderId = $form.find('input[name="order_id"]').val();
+        const currentTableId = $form.find('input[name="current_table_id"]').val();
+        const newTableId = $('#tableSwapNewTable').val();
+        const newTableNumber = $('#tableSwapNewTable option:selected').data('table-number') || $('#tableSwapNewTable option:selected').text();
+
+        if (!newTableId) {
+            Swal.fire('Select Table', 'Please select an available table first.', 'warning');
+            return;
+        }
+
+        Swal.fire({
+            icon: 'question',
+            title: 'Swap Table?',
+            text: 'Move this order to ' + newTableNumber + '?',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Swap',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            const $btn = $('#btnConfirmTableSwap');
+            const originalHtml = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Swapping...');
+
+            $.ajax({
+                url: "{{ route('pos.table_swap') }}",
+                type: 'POST',
+                data: {
+                    _token: $('meta[name="csrf-token"]').attr('content'),
+                    order_id: orderId,
+                    new_table_id: newTableId
+                },
+                success: function(res) {
+                    $btn.prop('disabled', false).html(originalHtml);
+
+                    if (res.status !== 'success') {
+                        Swal.fire('Error', res.message || 'Table swap failed.', 'error');
+                        return;
+                    }
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Table Swapped',
+                        text: res.message || 'Table swapped successfully.',
+                        timer: 900,
+                        showConfirmButton: false,
+                        allowOutsideClick: false,
+                        allowEscapeKey: false
+                    }).then(function() {
+                        window.location.reload();
+                    });
+
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 950);
+                },
+                error: function(xhr) {
+                    $btn.prop('disabled', false).html(originalHtml);
+                    let msg = 'Server error. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        msg = xhr.responseJSON.message;
+                    }
+                    Swal.fire('Error', msg, 'error');
+                }
+            });
         });
     });
 
