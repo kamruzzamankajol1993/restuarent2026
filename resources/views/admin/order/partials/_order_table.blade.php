@@ -4,7 +4,6 @@
       <tr>
         <th>Order #</th>
         <th>Customer</th>
-        <th>Items</th>
         <th>Subtotal</th>
         <th>Discount Amount</th>
         <th>Tips</th>
@@ -13,6 +12,7 @@
         <th>Grand Total</th>
         <th>Payment</th>
         <th>Status</th>
+        <th>Date</th>
         <th>Time</th>
         <th>Kitchen to Payment</th>
         <th>Actions</th>
@@ -42,18 +42,6 @@
                     <i class="bi bi-layout-wtf"></i> Table T-{{ $order->table->table_number ?? 'N/A' }}
                   @endif
                 </span>
-              </div>
-            </td>
-            <td>
-              <div class="progga-order-items-preview">
-                @php
-                    $previewItems = $order->orderDetails->take(2)->pluck('product_name')->implode(', ');
-                    $remaining = $order->orderDetails->count() - 2;
-                @endphp
-                <span class="progga-order-items-main">{{ $previewItems }}</span>
-                @if($remaining > 0)
-                    <span class="progga-order-items-more">+{{ $remaining }} more item(s)</span>
-                @endif
               </div>
             </td>
             <td><strong>৳{{ number_format($order->subtotal, 0) }}</strong></td>
@@ -91,7 +79,8 @@
             <td>
               <span class="progga-badge progga-badge-{{ $badgeClass }}"><i class="bi {{ $iconClass }}"></i> {{ $order->status }}</span>
             </td>
-            <td><span class="progga-order-time">{{ $order->created_at->diffForHumans() }}</span></td>
+            <td><span class="progga-order-time">{{ $order->created_at ? $order->created_at->format('d M Y') : '—' }}</span></td>
+            <td><span class="progga-order-time">{{ $order->created_at ? $order->created_at->format('h:i A') : '—' }}</span></td>
             <td><span class="progga-order-time">{{ is_null($order->kitchen_to_payment_minutes) ? '—' : $order->kitchen_to_payment_minutes . ' min' }}</span></td>
             <td>
               <div class="progga-table-actions d-flex align-items-center gap-1">

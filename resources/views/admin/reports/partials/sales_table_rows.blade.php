@@ -1,7 +1,5 @@
 @forelse($orders as $order)
     @php
-        $previewItems = $order->orderDetails->take(2)->pluck('product_name')->implode(', ');
-        $remaining = $order->orderDetails->count() - 2;
         $discountAmount = max(0, (float)($order->discount_amount ?? 0));
         $serviceCharge = max(0, (float)($order->service_charge ?? 0));
         $tipsAmount = max(0, (float)($order->tips_amount ?? 0));
@@ -25,14 +23,6 @@
             <strong>{{ optional($order->customer)->name ?? 'Walk-in Customer' }}</strong><br>
             <span class="text-muted" style="font-size:11px;">{{ $tableText }}</span>
         </td>
-        <td>
-            <div class="report-order-items-preview">
-                <span class="report-order-items-main">{{ $previewItems ?: '—' }}</span>
-                @if($remaining > 0)
-                    <span class="report-order-items-more">+{{ $remaining }} more item(s)</span>
-                @endif
-            </div>
-        </td>
         <td><strong>৳{{ number_format($order->subtotal, 0) }}</strong></td>
         <td><strong class="text-danger">৳{{ number_format($discountAmount, 0) }}</strong></td>
         <td>৳{{ number_format($serviceCharge, 0) }}</td>
@@ -42,7 +32,8 @@
         <td><strong style="color:var(--progga-primary);">৳{{ number_format($order->grand_total, 0) }}</strong></td>
         <td>{!! $paymentText !!}</td>
         <td><span class="progga-badge progga-badge-primary">{{ $order->status }}</span></td>
-        <td>{{ optional($order->created_at)->format('d M Y, h:i A') }}</td>
+        <td>{{ optional($order->created_at)->format('d M Y') }}</td>
+        <td>{{ optional($order->created_at)->format('h:i A') }}</td>
         <td>{{ is_null($order->kitchen_to_payment_minutes) ? '—' : $order->kitchen_to_payment_minutes . ' min' }}</td>
     </tr>
 @empty

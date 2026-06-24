@@ -29,11 +29,11 @@
     <div id="dateRangeFields" style="display: {{ $filterType == 'date' ? 'flex' : 'none' }}; gap:10px; align-items:flex-end; flex-wrap:wrap;">
         <div class="progga-form-group">
             <label class="progga-form-label">From Date</label>
-            <input type="text" name="start_date" id="startDate" class="progga-form-control datepicker" value="{{ $startDate->format('Y-m-d') }}" placeholder="YYYY-MM-DD" autocomplete="off">
+            <input type="text" name="start_date" id="startDate" class="progga-form-control datepicker" value="{{ $startDate->format('d-m-Y') }}" placeholder="DD-MM-YYYY" autocomplete="off">
         </div>
         <div class="progga-form-group">
             <label class="progga-form-label">To Date</label>
-            <input type="text" name="end_date" id="endDate" class="progga-form-control datepicker" value="{{ $endDate->format('Y-m-d') }}" placeholder="YYYY-MM-DD" autocomplete="off">
+            <input type="text" name="end_date" id="endDate" class="progga-form-control datepicker" value="{{ $endDate->format('d-m-Y') }}" placeholder="DD-MM-YYYY" autocomplete="off">
         </div>
     </div>
 
@@ -72,7 +72,7 @@ $(document).ready(function() {
     const $form = $('#reportFilterForm');
 
     flatpickr('.datepicker', {
-        dateFormat: 'Y-m-d',
+        dateFormat: 'd-m-Y',
         allowInput: true
     });
 

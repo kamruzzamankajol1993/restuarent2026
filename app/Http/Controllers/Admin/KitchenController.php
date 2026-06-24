@@ -126,7 +126,16 @@ class KitchenController extends Controller
     public function printKot($id)
     {
         $kot = OrderKot::with(['order.table', 'order.waiter', 'orderDetails'])->findOrFail($id);
-        return view('admin.kitchen.print_kot', compact('kot'));
+
+        // Add More Food / Running Order detection:
+        // If this order already had a non-Hold KOT before the current KOT,
+        // the current kitchen invoice is for a running order.
+        $isRunningOrder = OrderKot::where('order_id', $kot->order_id)
+            ->where('id', '<', $kot->id)
+            ->where('kitchen_status', '!=', 'Hold')
+            ->exists();
+
+        return view('admin.kitchen.print_kot', compact('kot', 'isRunningOrder'));
     }
 
     // AJAX: Mark Item as Unavailable & Recalculate Bill

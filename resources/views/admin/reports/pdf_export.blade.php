@@ -43,6 +43,7 @@
                 <tr>
                     <th>Order #</th>
                     <th>Date</th>
+                    <th>Time</th>
                     <th>Customer</th>
                     <th>Table</th>
                     <th>Payment Type</th>
@@ -57,6 +58,7 @@
                 <tr>
                     <td><strong>#{{ $row['order_number'] }}</strong></td>
                     <td>{{ $row['date'] }}</td>
+                    <td>{{ $row['time'] ?? '—' }}</td>
                     <td>{{ $row['customer'] }}</td>
                     <td>{{ $row['table'] }}</td>
                     <td>{{ $row['payment_type'] }}</td>
@@ -66,12 +68,12 @@
                     <td class="text-right"><strong>৳{{ number_format($row['total_paid'], 2) }}</strong></td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center">No payment data found.</td></tr>
+                <tr><td colspan="10" class="text-center">No payment data found.</td></tr>
             @endforelse
             </tbody>
             <tfoot>
                 <tr>
-                    <th colspan="5" class="text-right">Total</th>
+                    <th colspan="6" class="text-right">Total</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('cash'), 2) }}</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('card'), 2) }}</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('mfc'), 2) }}</th>
@@ -96,7 +98,6 @@
                 <tr>
                     <th>Order #</th>
                     <th>Customer</th>
-                    <th>Items</th>
                     <th class="text-right">Subtotal</th>
                     <th class="text-right">Discount</th>
                     <th class="text-right">Service</th>
@@ -106,6 +107,7 @@
                     <th class="text-right">Grand Total</th>
                     <th>Payment</th>
                     <th>Status</th>
+                    <th>Date</th>
                     <th>Time</th>
                     <th>KOT to Pay</th>
                 </tr>
@@ -113,8 +115,6 @@
             <tbody>
             @forelse($dataRows as $order)
                 @php
-                    $previewItems = $order->orderDetails->take(2)->pluck('product_name')->implode(', ');
-                    $remaining = $order->orderDetails->count() - 2;
                     $discountAmount = max(0, (float)($order->discount_amount ?? 0));
                     $serviceCharge = max(0, (float)($order->service_charge ?? 0));
                     $tipsAmount = max(0, (float)($order->tips_amount ?? 0));
@@ -138,12 +138,6 @@
                         <strong>{{ optional($order->customer)->name ?? 'Walk-in' }}</strong><br>
                         <span style="font-size:8px; color:#555;">{{ $tableText }}</span>
                     </td>
-                    <td>
-                        <span>{{ $previewItems ?: '—' }}</span>
-                        @if($remaining > 0)
-                            <br><span style="font-size:8px; color:#555; font-weight:bold;">+{{ $remaining }} more item(s)</span>
-                        @endif
-                    </td>
                     <td class="text-right">৳{{ number_format($order->subtotal, 0) }}</td>
                     <td class="text-right" style="color: red;">৳{{ number_format($discountAmount, 0) }}</td>
                     <td class="text-right">৳{{ number_format($serviceCharge, 0) }}</td>
@@ -153,7 +147,8 @@
                     <td class="text-right"><strong>৳{{ number_format($order->grand_total, 0) }}</strong></td>
                     <td>{!! $paymentText !!}</td>
                     <td>{{ $order->status }}</td>
-                    <td>{{ optional($order->created_at)->format('d M y, h:iA') }}</td>
+                    <td>{{ optional($order->created_at)->format('d M Y') }}</td>
+                    <td>{{ optional($order->created_at)->format('h:i A') }}</td>
                     <td>{{ is_null($order->kitchen_to_payment_minutes) ? '—' : $order->kitchen_to_payment_minutes . ' min' }}</td>
                 </tr>
             @empty
@@ -164,14 +159,14 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <th colspan="3" class="text-right">Total ({{ $dataRows->count() }} Orders)</th>
+                    <th colspan="2" class="text-right">Total ({{ $dataRows->count() }} Orders)</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('subtotal'), 0) }}</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('discount_amount'), 0) }}</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('service_charge'), 0) }}</th>
                     <th class="text-right">৳{{ number_format($dataRows->sum('tips_amount'), 0) }}</th>
                     <th colspan="2"></th>
                     <th class="text-right">৳{{ number_format($periodTotalSale, 0) }}</th>
-                    <th colspan="4"></th>
+                    <th colspan="5"></th>
                 </tr>
             </tfoot>
         </table>

@@ -14,6 +14,29 @@ use Mpdf\Output\Destination;
 
 class ReportController extends Controller
 {
+    /**
+     * Report filter date parser.
+     * Frontend datepicker shows/submits day-month-year (DD-MM-YYYY),
+     * but this also keeps old Y-m-d links working.
+     */
+    private function parseReportDate(?string $date): Carbon
+    {
+        $date = trim((string) $date);
+
+        foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd M Y', 'd F Y'] as $format) {
+            try {
+                $parsed = Carbon::createFromFormat($format, $date);
+                if ($parsed !== false) {
+                    return $parsed;
+                }
+            } catch (\Throwable $e) {
+                // Try the next known date format.
+            }
+        }
+
+        return Carbon::parse($date);
+    }
+
     private function resolveReportFilters(Request $request): array
     {
         $currentYear = Carbon::now()->year;
@@ -22,8 +45,18 @@ class ReportController extends Controller
         $month = (int) ($request->month ?: Carbon::now()->month);
 
         if ($filterType === 'date' && $request->start_date && $request->end_date) {
-            $startDate = Carbon::parse($request->start_date)->startOfDay();
-            $endDate = Carbon::parse($request->end_date)->endOfDay();
+            try {
+                $startDate = $this->parseReportDate($request->start_date)->startOfDay();
+                $endDate = $this->parseReportDate($request->end_date)->endOfDay();
+
+                if ($startDate->gt($endDate)) {
+                    [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+                }
+            } catch (\Throwable $e) {
+                $filterType = 'year';
+                $startDate = Carbon::create($year, 1, 1)->startOfYear()->startOfDay();
+                $endDate = Carbon::create($year, 12, 31)->endOfYear()->endOfDay();
+            }
         } elseif ($filterType === 'month') {
             $startDate = Carbon::create($year, $month, 1)->startOfMonth()->startOfDay();
             $endDate = Carbon::create($year, $month, 1)->endOfMonth()->endOfDay();
@@ -406,6 +439,13 @@ class ReportController extends Controller
 
     public function exportPdf(Request $request)
     {
+        // 1. বড় HTML স্ট্রিং পার্স করার জন্য লিমিটগুলো বাড়িয়ে দিন
+        @ini_set('pcre.backtrack_limit', '50000000');
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
+        @set_time_limit(300);
+
+        // 2. এরপর আপনার আগের কোডগুলো থাকবে
         $viewData = $this->exportViewData($request);
         $html = view('admin.reports.pdf_export', $viewData)->render();
         $fileName = $this->reportFileName($viewData['report'], 'pdf');

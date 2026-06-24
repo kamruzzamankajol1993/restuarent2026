@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Order;
 use Carbon\Carbon;
 use Mpdf\Mpdf;
+use Mpdf\HTMLParserMode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -54,32 +55,94 @@ class OrderController extends Controller
      * Order List/PDF/Excel export এর জন্য common filtered query.
      * এখানে নতুন filter add করলে তিন জায়গায় একইভাবে কাজ করবে।
      */
+    /**
+     * Order report date filter parser.
+     * UI now sends DD-MM-YYYY, but old Y-m-d links are still supported.
+     */
+    private function parseOrderFilterDate(?string $date): ?Carbon
+    {
+        $date = trim((string) $date);
+
+        if ($date === '') {
+            return null;
+        }
+
+        $formats = ['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d'];
+
+        foreach ($formats as $format) {
+            try {
+                $parsed = Carbon::createFromFormat($format, $date);
+                $errors = Carbon::getLastErrors();
+
+                if (($errors === false || (($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0))
+                    && $parsed
+                    && $parsed->format($format) === $date) {
+                    return $parsed;
+                }
+            } catch (\Throwable $e) {
+                // Try next supported format.
+            }
+        }
+
+        try {
+            return Carbon::parse($date);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     private function buildOrderReportQuery(Request $request)
     {
         $query = Order::with(['customer', 'table', 'orderDetails']);
 
-        // Search: Order number অথবা customer name — Order List table এর মতোই।
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('order_number', 'like', "%{$request->search}%")
-                  ->orWhereHas('customer', function ($c) use ($request) {
-                      $c->where('name', 'like', "%{$request->search}%");
+        // Search: order number অথবা customer name.
+        $search = trim((string) $request->input('search', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($c) use ($search) {
+                      $c->where('name', 'like', "%{$search}%");
                   });
             });
         }
 
-        // Status filter
-        if ($request->status) {
-            $query->where('status', $request->status);
+        // Status filter.
+        $status = trim((string) $request->input('status', ''));
+        if ($status !== '') {
+            $query->where('status', $status);
         }
 
         // Payment filter — Cash/Card/Mobile Banking/Split সব support করবে।
-        if ($request->payment) {
-            $query->where('payment_type', $request->payment);
+        $payment = trim((string) $request->input('payment', ''));
+        if ($payment !== '') {
+            $query->where('payment_type', $payment);
         }
 
-        // Date range filter
-        if ($request->date_range) {
+        // Date range filter from the order page JS: date_from/date_to.
+        // আগে controller শুধু date_range পড়ত, তাই PDF/Excel export অনেক সময় সব order নিয়ে নিত।
+        $dateFrom = trim((string) $request->input('date_from', ''));
+        $dateTo = trim((string) $request->input('date_to', ''));
+
+        if ($dateFrom !== '' || $dateTo !== '') {
+            $fromDate = $this->parseOrderFilterDate($dateFrom);
+            $toDate = $this->parseOrderFilterDate($dateTo);
+
+            if ($fromDate && $toDate) {
+                $from = $fromDate->copy()->startOfDay();
+                $to = $toDate->copy()->endOfDay();
+
+                if ($from->gt($to)) {
+                    [$from, $to] = [$toDate->copy()->startOfDay(), $fromDate->copy()->endOfDay()];
+                }
+
+                $query->whereBetween('created_at', [$from, $to]);
+            } elseif ($fromDate) {
+                $query->where('created_at', '>=', $fromDate->copy()->startOfDay());
+            } elseif ($toDate) {
+                $query->where('created_at', '<=', $toDate->copy()->endOfDay());
+            }
+        } elseif ($request->filled('date_range')) {
+            // Backward compatibility for old date_range filter.
             if ($request->date_range == 'Today') {
                 $query->whereDate('created_at', Carbon::today());
             } elseif ($request->date_range == 'Yesterday') {
@@ -95,13 +158,25 @@ class OrderController extends Controller
         return $query;
     }
 
- public function exportPDF(Request $request)
+    public function exportPDF(Request $request)
     {
-        $orders = $this->buildOrderReportQuery($request)->orderBy('id', 'desc')->get();
-        $restaurant = \App\Models\RestaurantSetting::first();
+        // Do not send one huge HTML string to mPDF.
+        // Also do not split one table across multiple WriteHTML calls.
+       // Time out এবং Memory issue যেন না হয় তার জন্য লিমিট বাড়িয়ে দেওয়া হলো
+        @ini_set('pcre.backtrack_limit', '10000000');
+        @ini_set('memory_limit', '1024M'); // ৫১২ মেগাবাইট থেকে বাড়িয়ে ১০২৪ মেগাবাইট (১ জিবি) করা হলো
+        @ini_set('max_execution_time', '300'); // ম্যাক্সিমাম এক্সিকিউশন টাইম ৫ মিনিট করা হলো
+        @set_time_limit(300); // স্ক্রিপ্ট টাইমআউট ১২০ সেকেন্ড থেকে বাড়িয়ে ৩০০ সেকেন্ড করা হলো (দরকার হলে 0 দিতে পারেন আনলিমিটেড টাইমের জন্য)
 
-        // Blade file থেকে HTML render করা হচ্ছে
-        $html = view('admin.order.pdf_report', compact('orders', 'restaurant'))->render();
+        $restaurant = \App\Models\RestaurantSetting::first();
+        $dateFilterLabel = $this->orderReportDateFilterLabel($request);
+        $baseQuery = $this->buildOrderReportQuery($request);
+        $totalOrders = (clone $baseQuery)->count();
+
+        $mpdfTempDir = storage_path('app/mpdf');
+        if (!is_dir($mpdfTempDir)) {
+            @mkdir($mpdfTempDir, 0775, true);
+        }
 
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
@@ -110,24 +185,120 @@ class OrderController extends Controller
             'margin_left' => 8,
             'margin_right' => 8,
             'margin_top' => 10,
-            'margin_bottom' => 10,
+            'margin_bottom' => 12,
             'margin_header' => 5,
             'margin_footer' => 5,
+            'tempDir' => $mpdfTempDir,
         ]);
 
         $mpdf->SetTitle('Order Report - ' . now()->format('d M, Y'));
-        $mpdf->WriteHTML($html);
+        // This puts "Generated" on the Left, leaves the Center blank, and puts "Page" on the Right.
+$mpdf->SetFooter('Generated: ' . now()->format('d M Y, h:i A') . '||Page {PAGENO} of {nbpg}');
+
+        $mpdf->WriteHTML(view('admin.order.pdf_report', [
+            'mode' => 'styles',
+        ])->render(), HTMLParserMode::HEADER_CSS);
+
+        $mpdf->WriteHTML(view('admin.order.pdf_report', [
+            'mode' => 'header',
+            'restaurant' => $restaurant,
+            'dateFilterLabel' => $dateFilterLabel,
+            'totalOrders' => $totalOrders,
+        ])->render(), HTMLParserMode::HTML_BODY);
+
+        $totals = [
+            'subtotal' => 0,
+            'revenue' => 0,
+            'discount' => 0,
+            'service_charge' => 0,
+            'tips' => 0,
+            'given' => 0,
+            'change' => 0,
+        ];
+
+        if ($totalOrders <= 0) {
+            $mpdf->WriteHTML(view('admin.order.pdf_report', [
+                'mode' => 'empty',
+            ])->render(), HTMLParserMode::HTML_BODY);
+        } else {
+            (clone $baseQuery)
+                ->orderBy('id', 'desc')
+                ->chunk(60, function ($orders) use ($mpdf, &$totals) {
+                    foreach ($orders as $order) {
+                        $discountAmount = max(0, (float) ($order->discount_amount ?? 0));
+                        $serviceCharge = max(0, (float) ($order->service_charge ?? 0));
+                        $tipsAmount = max(0, (float) ($order->tips_amount ?? ((float) ($order->total_paid_amount ?? 0) - (float) ($order->grand_total ?? 0))));
+                        $givenMoney = max(0, (float) ($order->given_money ?? 0));
+                        $changeAmount = max(0, (float) ($order->change_amount ?? 0));
+
+                        if ($order->status === 'Completed') {
+                            $totals['subtotal'] += (float) ($order->subtotal ?? 0);
+                            $totals['revenue'] += (float) ($order->grand_total ?? 0);
+                        }
+
+                        $totals['discount'] += $discountAmount;
+                        $totals['service_charge'] += $serviceCharge;
+                        $totals['tips'] += $tipsAmount;
+                        $totals['given'] += $givenMoney;
+                        $totals['change'] += $changeAmount;
+                    }
+
+                    // Important: every chunk is a complete table. No open <table>/<tbody> is carried
+                    // between WriteHTML calls. This prevents mPDF "Undefined array key" table-parser errors.
+                    $mpdf->WriteHTML(view('admin.order.pdf_report', [
+                        'mode' => 'table',
+                        'orders' => $orders,
+                    ])->render(), HTMLParserMode::HTML_BODY);
+                });
+        }
+
+        $mpdf->WriteHTML(view('admin.order.pdf_report', [
+            'mode' => 'summary',
+            'ordersCount' => $totalOrders,
+            'totals' => $totals,
+        ])->render(), HTMLParserMode::HTML_BODY);
 
         $fileName = 'Order_Report_' . now()->format('d_M_Y') . '.pdf';
 
-        // Output-এর আগে সব বাফার ক্লিন করা হচ্ছে যাতে কোরাপ্ট না হয়
-        if (ob_get_contents()) {
+        while (ob_get_level() > 0) {
             ob_end_clean();
         }
 
-        // সরাসরি mPDF আউটপুট ব্রাউজারে পাঠানো
-        $mpdf->Output($fileName, 'I');
-        exit;
+        return response($mpdf->Output($fileName, 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $fileName . '"',
+        ]);
+    }
+
+    private function orderReportDateFilterLabel(Request $request): string
+    {
+        $dateFrom = trim((string) $request->input('date_from', ''));
+        $dateTo = trim((string) $request->input('date_to', ''));
+
+        $fromDate = $this->parseOrderFilterDate($dateFrom);
+        $toDate = $this->parseOrderFilterDate($dateTo);
+
+        if ($fromDate && $toDate) {
+            return $fromDate->format('d M Y') . ' - ' . $toDate->format('d M Y');
+        }
+
+        if ($fromDate) {
+            return 'From ' . $fromDate->format('d M Y');
+        }
+
+        if ($toDate) {
+            return 'Until ' . $toDate->format('d M Y');
+        }
+
+        if ($dateFrom !== '' || $dateTo !== '') {
+            return 'Selected Date Range';
+        }
+
+        if ($request->filled('date_range')) {
+            return (string) $request->date_range;
+        }
+
+        return 'All Orders';
     }
 
     public function exportExcel(Request $request)

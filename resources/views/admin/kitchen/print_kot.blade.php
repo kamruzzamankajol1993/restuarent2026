@@ -39,6 +39,22 @@
       background: radial-gradient(circle at 7px -1px, #e8e8e8 7px, transparent 0) 0 0 / 14px 14px repeat-x;
     }
 
+
+    .running-order-banner {
+      width: 100%;
+      background: #000;
+      color: #fff;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 10px 8px;
+      border-radius: 6px 6px 0 0;
+      border-bottom: 2px solid #000;
+    }
+    .running-order-banner + .kot-header { border-radius: 0; }
+
     .kot-header {
       background: #fff;
       padding: 18px 20px 14px;
@@ -184,6 +200,12 @@
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
+      .running-order-banner {
+        background: #000 !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   </style>
 </head>
@@ -192,6 +214,10 @@
   <div class="page-label no-print">👨‍🍳 Kitchen Order Ticket</div>
 
   <div class="receipt-card">
+    @if(!empty($isRunningOrder))
+      <div class="running-order-banner">RUNNING ORDER</div>
+    @endif
+
     <div class="kot-header">
       <div class="kot-label">Kitchen Order Ticket</div>
       <div class="kot-header-row">

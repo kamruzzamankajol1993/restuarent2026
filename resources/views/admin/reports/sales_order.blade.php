@@ -12,9 +12,6 @@
     .report-table-wrap { overflow-x:auto; }
     .report-orders-table th { white-space: nowrap; font-size: 11px; }
     .report-orders-table td { vertical-align: top; font-size: 12px; }
-    .report-order-items-preview { display:flex; flex-direction:column; gap:2px; min-width:170px; }
-    .report-order-items-main { font-weight:700; color:var(--progga-text); }
-    .report-order-items-more { font-size:11px; color:var(--progga-text-muted); font-weight:700; }
     .report-pagination-wrap { padding:14px 16px; border-top:1px solid var(--progga-border-light); }
     .report-loading { opacity:.55; pointer-events:none; }
 </style>
@@ -98,7 +95,6 @@
           <tr>
             <th>Order #</th>
             <th>Customer</th>
-            <th>Items</th>
             <th>Subtotal</th>
             <th>Discount</th>
             <th>Service</th>
@@ -108,6 +104,7 @@
             <th>Grand Total</th>
             <th>Payment</th>
             <th>Status</th>
+            <th>Date</th>
             <th>Time</th>
             <th>KOT to Pay</th>
           </tr>

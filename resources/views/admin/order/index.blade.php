@@ -191,7 +191,7 @@
           <input type="text"
                  class="progga-form-control"
                  id="filterDateRange"
-                 placeholder="Select order date range"
+                 placeholder="Select order date range (DD-MM-YYYY)"
                  autocomplete="off"
                  readonly>
           <button type="button"
@@ -247,12 +247,12 @@
         if (typeof flatpickr !== 'undefined') {
             orderDatePicker = flatpickr('#filterDateRange', {
                 mode: 'range',
-                dateFormat: 'Y-m-d',
+                dateFormat: 'd-m-Y',
                 maxDate: 'today',
                 onChange: function(selectedDates) {
                     if (selectedDates.length === 2) {
-                        $('#filterDateFrom').val(flatpickr.formatDate(selectedDates[0], 'Y-m-d'));
-                        $('#filterDateTo').val(flatpickr.formatDate(selectedDates[1], 'Y-m-d'));
+                        $('#filterDateFrom').val(flatpickr.formatDate(selectedDates[0], 'd-m-Y'));
+                        $('#filterDateTo').val(flatpickr.formatDate(selectedDates[1], 'd-m-Y'));
                         fetchOrders();
                     }
 
