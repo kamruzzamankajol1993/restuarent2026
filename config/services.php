@@ -17,7 +17,9 @@ return [
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
-
+'offline_pos' => [
+    'sync_key' => env('OFFLINE_POS_SYNC_KEY'),
+],
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
