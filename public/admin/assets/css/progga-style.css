@@ -912,13 +912,19 @@ button { font-family: var(--font); }
 .progga-pos-step-divider { color: rgba(255,255,255,0.2); font-size: 16px; }
 
 .progga-pos-close {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.75);
-  width: 34px; height: 34px; border-radius: 50%;
-  cursor: pointer; font-size: 14px;
-  display: flex; align-items: center; justify-content: center;
-  transition: var(--t-base); text-decoration: none;
+    background: rgb(210 167 98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgb(0 0 0);
+    width: 34px;
+    height: 34px;
+    border-radius: 20%;
+    cursor: pointer;
+    font-size: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--t-base);
+    text-decoration: none;
 }
 .progga-pos-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
@@ -1051,7 +1057,7 @@ button { font-family: var(--font); }
 }
 .progga-pos-order-screen.active {
   display: grid;
-  grid-template-columns: 110px 1fr 380px;
+  grid-template-columns: 130px 1fr 380px;
   height: 100%;
   overflow: hidden;
 }
@@ -1090,10 +1096,10 @@ button { font-family: var(--font); }
 .progga-pos-cat-item:hover .progga-pos-cat-emoji  { filter: grayscale(0.1); transform: scale(1.1); }
 .progga-pos-cat-item.active .progga-pos-cat-emoji { filter: none; transform: scale(1.12); }
 .progga-pos-cat-name {
-  font-size: 8.5px; color: rgba(255,255,255,0.5);
+  font-size: 8.5px; color: rgba(255,255,255,1);
   font-weight: 600; line-height: 1.2;
   white-space: nowrap; overflow: hidden;
-  text-overflow: ellipsis; max-width: 82px;
+  text-overflow: ellipsis;
 }
 .progga-pos-cat-item:hover .progga-pos-cat-name  { color: rgba(255,255,255,0.75); }
 .progga-pos-cat-item.active .progga-pos-cat-name { color: var(--progga-secondary); font-weight: 700; }
@@ -1186,6 +1192,7 @@ button { font-family: var(--font); }
 }
 
 /* Cart */
+/* Cart */
 .progga-pos-cart {
   background: var(--progga-bg-white);
   border-left: 1px solid var(--progga-border-light);
@@ -1213,7 +1220,7 @@ button { font-family: var(--font); }
 }
 .progga-pos-cart-items { flex:3; overflow-y: auto; padding: 8px; }
 .progga-pos-cart-item {
-  padding: 10px 12px;
+  padding: 2px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--progga-border-light);
   background: var(--progga-bg-card);
@@ -1248,26 +1255,25 @@ button { font-family: var(--font); }
 .progga-pos-item-note-input { font-size: 11.5px; padding: 4px 8px; }
 
 .progga-pos-cart-totals {
-  padding: 12px 14px;
+  padding: 2px 10px;
   border-top: 1px solid var(--progga-border-light);
   background: var(--progga-bg);
 }
 .progga-pos-total-row {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 4px 0; font-size: 13px; color: var(--progga-text-muted);
+  padding: 0; font-size: 13px; color: var(--progga-text-muted);
 }
 .progga-pos-total-row.grand {
   border-top: 1.5px solid var(--progga-border);
-  margin-top: 8px; padding-top: 10px;
-  font-size: 17px; font-weight: 900;
+  margin-top: 0px; padding-top: 0px;
+  font-size: 16px; font-weight: 900;
   color: var(--progga-primary); letter-spacing: -0.3px;
 }
 .progga-pos-cart-actions {
-  padding: 12px;
+  padding: 2px 10px;
   display: flex; flex-direction: column; gap: 7px;
   border-top: 1px solid var(--progga-border-light);
   background: var(--progga-bg-white);
-  flex:1;
 }
 
 /* POS body overflow lock */

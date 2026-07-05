@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\OfflinePos\OfflinePosDataController;
+use App\Http\Controllers\Api\OfflinePos\OfflinePosSyncController;
 use App\Http\Middleware\VerifyOfflinePosKey;
 
 Route::get('/user', function (Request $request) {
@@ -12,6 +13,14 @@ Route::get('/user', function (Request $request) {
 Route::prefix('offline-pos')
     ->middleware(VerifyOfflinePosKey::class)
     ->group(function () {
+        Route::get('/ping', function () {
+            return response()->json([
+                'status' => true,
+                'message' => 'Main RMS is reachable.',
+                'server_time' => now()->toDateTimeString(),
+            ]);
+        });
+
         Route::get('/bootstrap', [OfflinePosDataController::class, 'bootstrap']);
 
         Route::get('/users', [OfflinePosDataController::class, 'users']);
@@ -34,4 +43,10 @@ Route::prefix('offline-pos')
         Route::get('/payment-methods', [OfflinePosDataController::class, 'paymentMethods']);
         Route::get('/active-orders', [OfflinePosDataController::class, 'activeOrders']);
         Route::get('/media-manifest', [OfflinePosDataController::class, 'mediaManifest']);
+
+
+        // Offline POS pull/push sync endpoints.
+        Route::get('/pull', [OfflinePosSyncController::class, 'pull']);
+        Route::post('/push/customers', [OfflinePosSyncController::class, 'pushCustomers']);
+        Route::post('/push/orders', [OfflinePosSyncController::class, 'pushOrders']);
     });

@@ -15,12 +15,6 @@
   const MUTED      = '#9aada5';
   const BG         = '#f2e2ce';
 
-  /* ─── Dynamic Dashboard Guard ─── */
-  function isDashboardDynamicCanvas(canvas) {
-    if (!canvas) return false;
-    return canvas.getAttribute('data-dashboard-dynamic') === 'true';
-  }
-
   /* ─── Default Chart.js Overrides ─── */
   function applyDefaults() {
     if (typeof Chart === 'undefined') return;
@@ -40,7 +34,7 @@
   /* ─── Revenue Line Chart ─── */
   function initRevenueChart() {
     const canvas = document.getElementById('revenueChart');
-    if (!canvas || isDashboardDynamicCanvas(canvas)) return;
+    if (!canvas) return;
 
     const data7 = {
       labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -162,7 +156,7 @@
   /* ─── Order Status Donut ─── */
   function initOrderStatusChart() {
     const canvas = document.getElementById('orderStatusChart');
-    if (!canvas || isDashboardDynamicCanvas(canvas)) return;
+    if (!canvas) return;
 
     new Chart(canvas, {
       type: 'doughnut',
