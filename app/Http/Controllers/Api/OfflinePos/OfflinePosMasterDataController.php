@@ -18,7 +18,7 @@ class OfflinePosMasterDataController extends Controller
 {
     private function guard(Request $request)
     {
-        $validKey = env('OFFLINE_POS_SYNC_KEY');
+        $validKey = config('offline_pos.sync_key') ?: config('services.offline_pos.sync_key') ?: env('OFFLINE_POS_SYNC_KEY');
         $givenKey = $request->header('X-OFFLINE-POS-KEY');
 
         if (!$validKey || !$givenKey || !hash_equals($validKey, $givenKey)) {
