@@ -9,13 +9,13 @@ use Carbon\Carbon;
 use Mpdf\Mpdf;
 use Mpdf\HTMLParserMode;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use App\Models\OrderDetail;
 use App\Models\OrderKot;
 use App\Models\Table;
 use App\Models\PosDeletedItemHistory;
 use App\Exports\OrdersExport;
+use App\Support\OrderVisibility;
 use Maatwebsite\Excel\Facades\Excel;
 
 class OrderController extends Controller
@@ -23,17 +23,28 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         // 1. Stats Calculation
+        // When Random Half is On, the cards count the same globally visible order set
+        // used by the unfiltered Order List. Today's complete orders remain included.
         $today = Carbon::today();
+        $statsQuery = OrderVisibility::apply(Order::query());
         $stats = [
-            'today_orders' => Order::whereDate('created_at', $today)->count(),
-            'active_orders' => Order::whereIn('status', ['Pending', 'Cooking', 'Processing'])->count(),
-            'completed_orders' => Order::where('status', 'Completed')->count(),
-            'revenue_today' => Order::whereDate('created_at', $today)->where('status', 'Completed')->sum('grand_total'),
+            'today_orders' => (clone $statsQuery)->whereDate('orders.created_at', $today)->count(),
+            'active_orders' => (clone $statsQuery)->whereIn('orders.status', ['Pending', 'Cooking', 'Processing'])->count(),
+            'completed_orders' => (clone $statsQuery)->where('orders.status', 'Completed')->count(),
+            'revenue_today' => (clone $statsQuery)
+                ->whereDate('orders.created_at', $today)
+                ->where('orders.status', 'Completed')
+                ->sum('orders.grand_total'),
         ];
 
         // 2. Query Builder
         // একই filter logic Order List, PDF export এবং Excel export — তিন জায়গায় use হবে।
         $query = $this->buildOrderReportQuery($request);
+
+        // When enabled by a Super Admin, show a deterministic random half of
+        // matching historical orders plus every matching order from today.
+        // PDF/Excel exports intentionally continue using the complete filtered query.
+        $query = OrderVisibility::apply($query, $request->except('page'));
 
         $orders = $query->orderBy('id', 'desc')->paginate(10)->appends($request->query());
 

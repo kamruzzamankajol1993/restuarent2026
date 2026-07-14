@@ -15,7 +15,8 @@ class PosSetting extends Model
         'auto_print_kitchen'      => 'boolean',
         'auto_print_invoice'      => 'boolean',
         'require_table_selection' => 'boolean',
-        'show_out_of_stock'       => 'boolean',
-        'items_per_page'          => 'integer',
+        'show_out_of_stock'                => 'boolean',
+        'order_list_random_half_enabled'    => 'boolean',
+        'items_per_page'                    => 'integer',
     ];
 }

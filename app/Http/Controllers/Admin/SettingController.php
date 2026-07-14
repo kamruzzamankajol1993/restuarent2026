@@ -82,12 +82,18 @@ class SettingController extends Controller
 
     public function updatePos(Request $request)
     {
-        $data = $request->except(['_token']);
+        // This option is intentionally excluded from mass assignment below.
+        // Only a Super Admin may change the global Order List visibility mode.
+        $data = $request->except(['_token', 'order_list_random_half_enabled']);
         $data['auto_print_kitchen'] = $request->has('auto_print_kitchen');
         $data['auto_print_invoice'] = $request->has('auto_print_invoice');
         $data['require_table_selection'] = $request->has('require_table_selection');
         $data['show_out_of_stock'] = $request->has('show_out_of_stock');
         $data['final_payment_depends_on_kitchen_status'] = $request->has('final_payment_depends_on_kitchen_status');
+
+        if ($request->user() && $request->user()->hasRole('Super Admin')) {
+            $data['order_list_random_half_enabled'] = $request->boolean('order_list_random_half_enabled');
+        }
 
         $pos = PosSetting::first() ?? new PosSetting();
         $pos->fill($data);
