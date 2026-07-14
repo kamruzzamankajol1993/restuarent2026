@@ -45,9 +45,30 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission]);
         }
 
+        // Human Resources permissions
+        $hrPermissions = [
+            'hr-dashboard-view',
+            'employee-view',
+            'employee-create',
+            'employee-edit',
+            'employee-delete',
+            'hr-setting-view',
+            'hr-setting-manage',
+        ];
+
+        foreach ($hrPermissions as $permissionName) {
+            Permission::updateOrCreate(
+                ['name' => $permissionName, 'guard_name' => 'web'],
+                ['group_name' => 'Human Resources']
+            );
+        }
+
+        Role::firstOrCreate(['name' => 'Employee', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'waiter', 'guard_name' => 'web']);
+
         // 'Super Admin' রোল তৈরি করা এবং সব পারমিশন দেওয়া
         $role = Role::firstOrCreate(['name' => 'Super Admin']);
-        $role->givePermissionTo(Permission::all());
+        $role->syncPermissions(Permission::all());
 
         // প্রোফাইল পেজের ডেমো অনুযায়ী নতুন ইউজার তৈরি করা (নতুন কলাম সহ)
         $user = User::firstOrCreate(

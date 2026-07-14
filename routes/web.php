@@ -19,6 +19,9 @@ use App\Http\Controllers\Admin\TableController;
 use App\Http\Controllers\Admin\TableBookingController;
 use App\Http\Controllers\Admin\OccasionController;
 use App\Http\Controllers\Admin\FoodCategoryController;
+use App\Http\Controllers\Admin\HrDashboardController;
+use App\Http\Controllers\Admin\EmployeeController;
+use App\Http\Controllers\Admin\HrSettingController;
 Route::get('/', function () {
     return view('admin.auth.login');
 });
@@ -225,6 +228,54 @@ Route::get('customer-export-excel', [CustomerController::class, 'exportExcel'])-
 Route::post('waiter-update-status', [WaiterController::class, 'updateStatus'])->name('waiter.status');
     // Waiter Management Routes
     Route::resource('waiter', WaiterController::class);
+
+    // ==========================================
+    // Human Resources
+    // ==========================================
+    Route::prefix('hr')->name('hr.')->group(function () {
+        Route::get('/dashboard', [HrDashboardController::class, 'index'])->name('dashboard');
+
+        Route::patch('/employees/{employee}/status', [EmployeeController::class, 'updateStatus'])->name('employees.status');
+        Route::post('/employees/{employee}/documents', [EmployeeController::class, 'storeDocument'])->name('employees.documents.store');
+        Route::delete('/employees/{employee}/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
+        Route::post('/employees/{employee}/salary-components', [EmployeeController::class, 'storeSalaryComponent'])->name('employees.salary-components.store');
+        Route::put('/employees/{employee}/salary-components/{employeeSalaryComponent}', [EmployeeController::class, 'updateSalaryComponent'])->name('employees.salary-components.update');
+        Route::delete('/employees/{employee}/salary-components/{employeeSalaryComponent}', [EmployeeController::class, 'destroySalaryComponent'])->name('employees.salary-components.destroy');
+        Route::resource('employees', EmployeeController::class);
+
+        Route::get('/settings', [HrSettingController::class, 'index'])->name('settings.index');
+
+        Route::post('/settings/departments', [HrSettingController::class, 'storeDepartment'])->name('settings.departments.store');
+        Route::put('/settings/departments/{department}', [HrSettingController::class, 'updateDepartment'])->name('settings.departments.update');
+        Route::delete('/settings/departments/{department}', [HrSettingController::class, 'destroyDepartment'])->name('settings.departments.destroy');
+
+        Route::post('/settings/designations', [HrSettingController::class, 'storeDesignation'])->name('settings.designations.store');
+        Route::put('/settings/designations/{designation}', [HrSettingController::class, 'updateDesignation'])->name('settings.designations.update');
+        Route::delete('/settings/designations/{designation}', [HrSettingController::class, 'destroyDesignation'])->name('settings.designations.destroy');
+
+        Route::post('/settings/employment-types', [HrSettingController::class, 'storeEmploymentType'])->name('settings.employment-types.store');
+        Route::put('/settings/employment-types/{employmentType}', [HrSettingController::class, 'updateEmploymentType'])->name('settings.employment-types.update');
+        Route::delete('/settings/employment-types/{employmentType}', [HrSettingController::class, 'destroyEmploymentType'])->name('settings.employment-types.destroy');
+
+        Route::post('/settings/shifts', [HrSettingController::class, 'storeShift'])->name('settings.shifts.store');
+        Route::put('/settings/shifts/{shift}', [HrSettingController::class, 'updateShift'])->name('settings.shifts.update');
+        Route::delete('/settings/shifts/{shift}', [HrSettingController::class, 'destroyShift'])->name('settings.shifts.destroy');
+
+        Route::post('/settings/leave-types', [HrSettingController::class, 'storeLeaveType'])->name('settings.leave-types.store');
+        Route::put('/settings/leave-types/{leaveType}', [HrSettingController::class, 'updateLeaveType'])->name('settings.leave-types.update');
+        Route::delete('/settings/leave-types/{leaveType}', [HrSettingController::class, 'destroyLeaveType'])->name('settings.leave-types.destroy');
+
+        Route::post('/settings/holidays', [HrSettingController::class, 'storeHoliday'])->name('settings.holidays.store');
+        Route::put('/settings/holidays/{holiday}', [HrSettingController::class, 'updateHoliday'])->name('settings.holidays.update');
+        Route::delete('/settings/holidays/{holiday}', [HrSettingController::class, 'destroyHoliday'])->name('settings.holidays.destroy');
+
+        Route::post('/settings/salary-components', [HrSettingController::class, 'storeSalaryComponent'])->name('settings.salary-components.store');
+        Route::put('/settings/salary-components/{salaryComponent}', [HrSettingController::class, 'updateSalaryComponent'])->name('settings.salary-components.update');
+        Route::delete('/settings/salary-components/{salaryComponent}', [HrSettingController::class, 'destroySalaryComponent'])->name('settings.salary-components.destroy');
+
+        Route::post('/settings/attendance-rules', [HrSettingController::class, 'updateAttendanceRules'])->name('settings.attendance-rules.update');
+        Route::post('/settings/payroll-settings', [HrSettingController::class, 'updatePayrollSettings'])->name('settings.payroll-settings.update');
+    });
 
 
     Route::resource('permission', PermissionController::class);

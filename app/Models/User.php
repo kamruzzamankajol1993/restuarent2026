@@ -51,4 +51,20 @@ class User extends Authenticatable
             'last_login' => 'datetime', // DateTime object hishebe pabar jonno
         ];
     }
+
+    /**
+     * HR employee profile linked to this login account.
+     */
+    public function employee()
+    {
+        return $this->hasOne(Employee::class);
+    }
+
+    /**
+     * Existing waiter profile linked directly through waiters.user_id.
+     */
+    public function waiter()
+    {
+        return $this->hasOne(Waiter::class);
+    }
 }

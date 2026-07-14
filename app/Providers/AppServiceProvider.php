@@ -4,12 +4,14 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Gate;
 use App\Models\RestaurantSetting;
 use App\Models\TaxSetting;
 use App\Models\InvoiceSetting;
 use App\Models\PosSetting;
 use App\Models\Waiter;     // নতুন যুক্ত করা হলো
 use App\Models\Customer;   // নতুন যুক্ত করা হলো
+use App\Models\User;
 use Exception;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,6 +29,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Super Admin receives all application abilities, including newly added HR permissions.
+        Gate::before(function (User $user, string $ability) {
+            return $user->hasRole('Super Admin') ? true : null;
+        });
+
         try {
             // ১. ডাটাবেস থেকে সেটিংসের প্রথম রেকর্ডগুলো ফেচ করা হচ্ছে
             $restaurantSetting = RestaurantSetting::first();

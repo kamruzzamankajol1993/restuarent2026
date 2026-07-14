@@ -26,4 +26,12 @@ class Waiter extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * HR employee profile. employees.waiter_id is optional and unique.
+     */
+    public function employee()
+    {
+        return $this->hasOne(Employee::class);
+    }
 }
