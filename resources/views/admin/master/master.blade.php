@@ -28,6 +28,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
@@ -37,6 +38,10 @@
   <link rel="stylesheet" href="{{ asset('/') }}public/admin/assets/css/progga-style.css">
  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <style>
+    .flatpickr-calendar {
+      z-index: 10999 !important;
+    }
+
     /* New Web Order Alert modal height/dropdown fix */
     #newQrOrderModal {
       z-index: 99990;
@@ -276,6 +281,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -312,6 +318,71 @@
         dateFormat: "Y-m-d",
         allowInput: true,
     });
+
+
+    // HR date fields: display DD-MM-YYYY, submit Y-m-d to Laravel.
+    document.querySelectorAll('.hr-datepicker').forEach(function (element) {
+        if (element._flatpickr) return;
+
+        flatpickr(element, {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'd-m-Y',
+            allowInput: true,
+            disableMobile: true,
+            onReady: function (selectedDates, dateStr, instance) {
+                if (instance.input.required && instance.altInput) {
+                    instance.altInput.required = true;
+                }
+            },
+        });
+    });
+
+    // HR month filters: display a month selector, submit Y-m.
+    document.querySelectorAll('.hr-monthpicker').forEach(function (element) {
+        if (element._flatpickr) return;
+
+        const options = {
+            dateFormat: 'Y-m',
+            altInput: true,
+            altFormat: 'F Y',
+            allowInput: false,
+            disableMobile: true,
+            onReady: function (selectedDates, dateStr, instance) {
+                if (instance.input.required && instance.altInput) {
+                    instance.altInput.required = true;
+                }
+            },
+        };
+
+        if (typeof monthSelectPlugin !== 'undefined') {
+            options.plugins = [
+                new monthSelectPlugin({
+                    shorthand: true,
+                    dateFormat: 'Y-m',
+                    altFormat: 'F Y',
+                }),
+            ];
+        }
+
+        flatpickr(element, options);
+    });
+
+    // Keep JavaScript-populated date fields and Flatpickr alt inputs synchronized.
+    window.setHrDatePickerValue = function (target, value) {
+        const element = typeof target === 'string'
+            ? document.getElementById(target) || document.querySelector(target)
+            : target;
+
+        if (!element) return;
+
+        if (element._flatpickr) {
+            const format = element.classList.contains('hr-monthpicker') ? 'Y-m' : 'Y-m-d';
+            element._flatpickr.setDate(value || '', false, format);
+        } else {
+            element.value = value || '';
+        }
+    };
 
     // ৩. Summernote Lite (Rich Text Editor)
     if (typeof jQuery !== 'undefined') {

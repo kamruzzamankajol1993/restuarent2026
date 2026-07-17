@@ -22,6 +22,12 @@ use App\Http\Controllers\Admin\FoodCategoryController;
 use App\Http\Controllers\Admin\HrDashboardController;
 use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\HrSettingController;
+use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\DutyRosterController;
+use App\Http\Controllers\Admin\LeaveManagementController;
+use App\Http\Controllers\Admin\PayrollController;
+use App\Http\Controllers\Admin\SalaryAdvanceController;
+use App\Http\Controllers\Admin\HrReportController;
 Route::get('/', function () {
     return view('admin.auth.login');
 });
@@ -234,6 +240,54 @@ Route::post('waiter-update-status', [WaiterController::class, 'updateStatus'])->
     // ==========================================
     Route::prefix('hr')->name('hr.')->group(function () {
         Route::get('/dashboard', [HrDashboardController::class, 'index'])->name('dashboard');
+
+        // Attendance
+        Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+        Route::post('/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
+        Route::put('/attendance/{attendance}', [AttendanceController::class, 'update'])->name('attendance.update');
+        Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy'])->name('attendance.destroy');
+        Route::post('/attendance/import', [AttendanceController::class, 'import'])->name('attendance.import');
+        Route::get('/attendance/import-template', [AttendanceController::class, 'template'])->name('attendance.template');
+        Route::post('/attendance/mark-absent', [AttendanceController::class, 'markAbsent'])->name('attendance.mark-absent');
+
+        // Shift assignments and duty roster
+        Route::get('/shift-roster', [DutyRosterController::class, 'index'])->name('roster.index');
+        Route::post('/shift-roster', [DutyRosterController::class, 'storeRoster'])->name('roster.store');
+        Route::post('/shift-roster/bulk', [DutyRosterController::class, 'bulkGenerate'])->name('roster.bulk');
+        Route::delete('/shift-roster/{roster}', [DutyRosterController::class, 'destroyRoster'])->name('roster.destroy');
+        Route::post('/shift-assignments', [DutyRosterController::class, 'storeAssignment'])->name('roster.assignments.store');
+        Route::put('/shift-assignments/{assignment}', [DutyRosterController::class, 'updateAssignment'])->name('roster.assignments.update');
+        Route::delete('/shift-assignments/{assignment}', [DutyRosterController::class, 'destroyAssignment'])->name('roster.assignments.destroy');
+
+        // Leave management
+        Route::get('/leave', [LeaveManagementController::class, 'index'])->name('leave.index');
+        Route::post('/leave', [LeaveManagementController::class, 'store'])->name('leave.store');
+        Route::patch('/leave/{leaveRequest}/approve', [LeaveManagementController::class, 'approve'])->name('leave.approve');
+        Route::patch('/leave/{leaveRequest}/reject', [LeaveManagementController::class, 'reject'])->name('leave.reject');
+        Route::patch('/leave/{leaveRequest}/cancel', [LeaveManagementController::class, 'cancel'])->name('leave.cancel');
+        Route::post('/leave-balance', [LeaveManagementController::class, 'saveBalance'])->name('leave.balance');
+
+        // Payroll
+        Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll.index');
+        Route::post('/payroll/periods', [PayrollController::class, 'storePeriod'])->name('payroll.periods.store');
+        Route::get('/payroll/periods/{period}', [PayrollController::class, 'show'])->name('payroll.show');
+        Route::post('/payroll/periods/{period}/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
+        Route::patch('/payroll/periods/{period}/approve', [PayrollController::class, 'approve'])->name('payroll.approve');
+        Route::post('/payroll/{payroll}/regenerate', [PayrollController::class, 'regenerate'])->name('payroll.regenerate');
+        Route::post('/payroll/{payroll}/payment', [PayrollController::class, 'payment'])->name('payroll.payment');
+        Route::get('/payroll/{payroll}/payslip', [PayrollController::class, 'payslip'])->name('payroll.payslip');
+
+        // Salary advance / loan
+        Route::get('/salary-advance-loan', [SalaryAdvanceController::class, 'index'])->name('advances.index');
+        Route::post('/salary-advance-loan', [SalaryAdvanceController::class, 'store'])->name('advances.store');
+        Route::patch('/salary-advance-loan/{advance}/approve', [SalaryAdvanceController::class, 'approve'])->name('advances.approve');
+        Route::patch('/salary-advance-loan/{advance}/reject', [SalaryAdvanceController::class, 'reject'])->name('advances.reject');
+        Route::post('/salary-advance-loan/{advance}/repayment', [SalaryAdvanceController::class, 'repayment'])->name('advances.repayment');
+        Route::delete('/salary-advance-loan/{advance}', [SalaryAdvanceController::class, 'destroy'])->name('advances.destroy');
+
+        // HR reports
+        Route::get('/reports', [HrReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/export', [HrReportController::class, 'export'])->name('reports.export');
 
         Route::patch('/employees/{employee}/status', [EmployeeController::class, 'updateStatus'])->name('employees.status');
         Route::post('/employees/{employee}/documents', [EmployeeController::class, 'storeDocument'])->name('employees.documents.store');

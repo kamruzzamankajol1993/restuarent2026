@@ -70,19 +70,19 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Join Date <span class="text-danger">*</span></label>
-                        <input type="date" name="join_date" class="progga-form-control" value="{{ old('join_date', isset($employee) && $employee->join_date ? $employee->join_date->format('Y-m-d') : now()->format('Y-m-d')) }}" required>
+                        <input type="text" name="join_date" class="progga-form-control hr-datepicker" value="{{ old('join_date', isset($employee) && $employee->join_date ? $employee->join_date->format('Y-m-d') : now()->format('Y-m-d')) }}" required autocomplete="off" placeholder="DD-MM-YYYY">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Confirmation Date</label>
-                        <input type="date" name="confirmation_date" class="progga-form-control" value="{{ old('confirmation_date', isset($employee) && $employee->confirmation_date ? $employee->confirmation_date->format('Y-m-d') : '') }}">
+                        <input type="text" name="confirmation_date" class="progga-form-control hr-datepicker" value="{{ old('confirmation_date', isset($employee) && $employee->confirmation_date ? $employee->confirmation_date->format('Y-m-d') : '') }}" autocomplete="off" placeholder="DD-MM-YYYY">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Resignation Date</label>
-                        <input type="date" name="resignation_date" class="progga-form-control" value="{{ old('resignation_date', isset($employee) && $employee->resignation_date ? $employee->resignation_date->format('Y-m-d') : '') }}">
+                        <input type="text" name="resignation_date" class="progga-form-control hr-datepicker" value="{{ old('resignation_date', isset($employee) && $employee->resignation_date ? $employee->resignation_date->format('Y-m-d') : '') }}" autocomplete="off" placeholder="DD-MM-YYYY">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Termination Date</label>
-                        <input type="date" name="termination_date" class="progga-form-control" value="{{ old('termination_date', isset($employee) && $employee->termination_date ? $employee->termination_date->format('Y-m-d') : '') }}">
+                        <input type="text" name="termination_date" class="progga-form-control hr-datepicker" value="{{ old('termination_date', isset($employee) && $employee->termination_date ? $employee->termination_date->format('Y-m-d') : '') }}" autocomplete="off" placeholder="DD-MM-YYYY">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
@@ -98,7 +98,7 @@
             <div class="progga-card-header"><div class="progga-card-title">Personal & Contact Information</div></div>
             <div class="progga-card-body">
                 <div class="row g-3">
-                    <div class="col-md-3"><label class="form-label fw-semibold">Date of Birth</label><input type="date" name="date_of_birth" class="progga-form-control" value="{{ old('date_of_birth', isset($employee) && $employee->date_of_birth ? $employee->date_of_birth->format('Y-m-d') : '') }}"></div>
+                    <div class="col-md-3"><label class="form-label fw-semibold">Date of Birth</label><input type="text" name="date_of_birth" class="progga-form-control hr-datepicker" value="{{ old('date_of_birth', isset($employee) && $employee->date_of_birth ? $employee->date_of_birth->format('Y-m-d') : '') }}" autocomplete="off" placeholder="DD-MM-YYYY"></div>
                     <div class="col-md-3"><label class="form-label fw-semibold">Gender</label><select name="gender" class="progga-form-control"><option value="">Select</option>@foreach(['male','female','other'] as $gender)<option value="{{ $gender }}" @selected(old('gender', $employee->gender ?? '') === $gender)>{{ ucfirst($gender) }}</option>@endforeach</select></div>
                     <div class="col-md-3"><label class="form-label fw-semibold">Blood Group</label><input type="text" name="blood_group" class="progga-form-control" value="{{ old('blood_group', $employee->blood_group ?? '') }}" placeholder="e.g. A+"></div>
                     <div class="col-md-3"><label class="form-label fw-semibold">NID Number</label><input type="text" name="nid_number" class="progga-form-control" value="{{ old('nid_number', $employee->nid_number ?? '') }}"></div>

@@ -106,8 +106,8 @@
                         @csrf
                         <div class="col-md-3"><label class="form-label small fw-semibold">Document Type</label><input type="text" name="document_type" class="progga-form-control" placeholder="NID / Contract" required></div>
                         <div class="col-md-3"><label class="form-label small fw-semibold">Document Number</label><input type="text" name="document_number" class="progga-form-control"></div>
-                        <div class="col-md-3"><label class="form-label small fw-semibold">Issue Date</label><input type="date" name="issue_date" class="progga-form-control"></div>
-                        <div class="col-md-3"><label class="form-label small fw-semibold">Expiry Date</label><input type="date" name="expiry_date" class="progga-form-control"></div>
+                        <div class="col-md-3"><label class="form-label small fw-semibold">Issue Date</label><input type="text" name="issue_date" class="progga-form-control hr-datepicker" autocomplete="off" placeholder="DD-MM-YYYY"></div>
+                        <div class="col-md-3"><label class="form-label small fw-semibold">Expiry Date</label><input type="text" name="expiry_date" class="progga-form-control hr-datepicker" autocomplete="off" placeholder="DD-MM-YYYY"></div>
                         <div class="col-md-5"><label class="form-label small fw-semibold">File</label><input type="file" name="document_file" class="progga-form-control" required></div>
                         <div class="col-md-5"><label class="form-label small fw-semibold">Notes</label><input type="text" name="document_notes" class="progga-form-control"></div>
                         <div class="col-md-2"><button class="progga-btn progga-btn-primary w-100" type="submit"><i class="bi bi-upload"></i> Upload</button></div>
@@ -159,8 +159,8 @@
                         </div>
                         <div class="col-md-2"><label class="form-label small fw-semibold">Amount</label><input id="employeeSalaryAmount" type="number" step="0.01" min="0" name="amount" class="progga-form-control"></div>
                         <div class="col-md-2"><label class="form-label small fw-semibold">Percentage</label><input id="employeeSalaryPercentage" type="number" step="0.0001" min="0" max="100" name="percentage" class="progga-form-control"></div>
-                        <div class="col-md-2"><label class="form-label small fw-semibold">Effective From *</label><input id="employeeSalaryFrom" type="date" name="effective_from" class="progga-form-control" value="{{ now()->format('Y-m-d') }}" required></div>
-                        <div class="col-md-2"><label class="form-label small fw-semibold">Effective To</label><input id="employeeSalaryTo" type="date" name="effective_to" class="progga-form-control"></div>
+                        <div class="col-md-2"><label class="form-label small fw-semibold">Effective From *</label><input id="employeeSalaryFrom" type="text" name="effective_from" class="progga-form-control hr-datepicker" value="{{ now()->format('Y-m-d') }}" required autocomplete="off" placeholder="DD-MM-YYYY"></div>
+                        <div class="col-md-2"><label class="form-label small fw-semibold">Effective To</label><input id="employeeSalaryTo" type="text" name="effective_to" class="progga-form-control hr-datepicker" autocomplete="off" placeholder="DD-MM-YYYY"></div>
                         <div class="col-md-8 d-flex flex-wrap align-items-center gap-3">
                             <label class="form-check mb-0"><input id="employeeSalaryStatus" class="form-check-input" type="checkbox" name="status" value="1" checked> Active</label>
                             <span class="small text-muted">Fixed components require an amount; percentage components require a percentage.</span>
@@ -215,8 +215,8 @@ function editEmployeeSalaryComponent(item) {
     document.getElementById('employeeSalaryComponent').value = item.salary_component_id || '';
     document.getElementById('employeeSalaryAmount').value = item.amount ?? '';
     document.getElementById('employeeSalaryPercentage').value = item.percentage ?? '';
-    document.getElementById('employeeSalaryFrom').value = item.effective_from || '';
-    document.getElementById('employeeSalaryTo').value = item.effective_to || '';
+    setHrDatePickerValue('employeeSalaryFrom', item.effective_from || '');
+    setHrDatePickerValue('employeeSalaryTo', item.effective_to || '');
     document.getElementById('employeeSalaryStatus').checked = !!item.status;
     document.getElementById('employeeSalarySubmit').innerHTML = '<i class="bi bi-check-circle"></i> Update';
     document.getElementById('employeeSalaryCancel').classList.remove('d-none');
@@ -228,7 +228,8 @@ function resetEmployeeSalaryForm() {
     form.reset();
     form.action = @json(route('hr.employees.salary-components.store', $employee));
     document.getElementById('employeeSalaryMethod').value = 'POST';
-    document.getElementById('employeeSalaryFrom').value = @json(now()->format('Y-m-d'));
+    setHrDatePickerValue('employeeSalaryFrom', @json(now()->format('Y-m-d')));
+    setHrDatePickerValue('employeeSalaryTo', '');
     document.getElementById('employeeSalaryStatus').checked = true;
     document.getElementById('employeeSalarySubmit').innerHTML = '<i class="bi bi-plus-circle"></i> Assign';
     document.getElementById('employeeSalaryCancel').classList.add('d-none');
